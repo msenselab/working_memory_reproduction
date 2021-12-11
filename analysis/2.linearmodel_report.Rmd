@@ -105,7 +105,6 @@ WMCrr2 <- ggplot(meanForPlot, aes(WMSize, mean_WMCrr, ymin = mean_WMCrr - se_WMC
   labs(x = "Memory load", y = "Mean correct rates of WM task") +
   theme_new 
 WMCrr2
-ggsave(paste0(getwd(), "/figures/WMCrr2.png"), WMCrr2, width = 4, height = 4)
 ```
 
 
@@ -205,7 +204,6 @@ funMergeMRlt <- function(explist, path, version){
   write.csv(AllDat_Bayparlist, paste0(getwd(), "/", path, "/rlt/AllDat_Bayparlist_", modelversion, ".csv"))
   write.csv(AllDat_predY, paste0( getwd(), "/",path, "/rlt/AllDat_predY_", modelversion, ".csv"))
   write.csv(AllDat_newY, paste0(getwd(), "/",path, "/rlt/AllDat_newY_", modelversion, ".csv"))
-  saveRDS(modelResultAll, file = paste0(getwd(), "/", path, "/rlt/modelResultAll_", modelversion, ".rds")) 
 }
 
 ```
@@ -242,8 +240,6 @@ for (i in 1: length(obsevY_list)){
   else
     obsevRP_list = left_join(obsevRP_list, temp, by=c("curDur","Exp",  "NSub"))
 }
-
-write.csv(obsevRP_list,paste0(modelPath, '/rlt/ObsevRP.csv'))
 ```
 
 
@@ -505,7 +501,6 @@ for (i in 1: length(slopes_list)){
   else
     slopes_spss = left_join(slopes_spss, temp, by=c("Exp",  "NSub"))
 }
-write_csv(slopes_spss, paste0(modelPath, '/rlt/Sub_slopes_InP.csv'))
 ```
 
 
@@ -522,10 +517,7 @@ InPAnova
 ```{r}
 meanInP  <- dplyr::group_by(slopes, Exp, WMSize) %>%
   dplyr::summarise(mInP = mean(inP), n =n(), seInP = sd(inP)/sqrt(n-1))
-meanInP#
-
-write_csv(meanInP, paste0(modelPath, '/rlt/Sub_InP.csv'))
-write_csv(meanInP, paste0(modelPath, '/rlt/Sub_meanInP.csv'))
+meanInP
 ```
 
 ```{r}
@@ -555,9 +547,6 @@ RP  <- ggplot(data = m_predY, aes(x = curDur, y = m_m_mu_r, color=WMSize, group 
   facet_grid(cols = vars(Exp)) +
   labs(x="", y="Reproduction (s)", shape=" ", color = "Memory Load")+
   theme_new+colorSet3
-
-ggsave(paste0(getwd(), "/", modelPath, "/figures/RP.png"), RP, width = 6, height = 6)
-
 RP
 ```
 
@@ -573,7 +562,6 @@ RP_CV <- ggplot(data= m_predY, aes(x=curDur, y= m_sd_repDur/m_m_repDur, color=WM
         strip.text.x = element_blank())+
   colorSet3
 RP_CV
-ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_CV.png"), RP_CV, width = 6, height = 6)
 ```
 
 
@@ -622,9 +610,6 @@ for (i in 1: length(CVslopes_list)){
   else
     CVslopes_spss = left_join(CVslopes_spss, temp, by=c("Exp",  "NSub"))
 }
-write_csv(CVslopes_spss, paste0(modelPath, '/rlt/Sub_CV_slopes.csv'))
-
-
 
 mCVslopes <- CVslopes%>% dplyr::group_by(WMSize, Exp) %>%
   dplyr::summarize(m_Intercept = mean(Intercept), 
@@ -642,7 +627,7 @@ plt_CVslope <- ggplot(mCVslopes, aes(Exp, m_slope, ymin = m_slope - se_slope, ym
   labs(x = "", y = TeX("Mean slope of CV curve"), color = 'Memory Load') +
   theme_new 
 plt_CVslope
-ggsave(paste0(getwd(), "/figures/plt_CVslope.png"), plt_CVslope, width = 4, height = 4)
+
 ```
 
 ```{r}
@@ -656,7 +641,6 @@ RP_CV_slope <- ggplot(data= m_predY, aes(x=log(curDur), y= log(m_sd_repDur/m_m_r
         strip.text.x = element_blank())+
   colorSet3 +xlim(-0.8, 0.6)
 RP_CV_slope
-ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_CV_slope.png"), RP_CV_slope, width = 6, height = 3)
 ```
 
 ## Estimation of parameters in our proposed model
@@ -706,17 +690,7 @@ mm_Baypar_melt <- Bayparlist_melt %>%
 ```
 
 
-
-```{r include=FALSE}
-### save the model results
-write.csv(Bayparlist,paste0(modelPath, '/rlt/Sub_Baypar.csv'))
-write.csv(mm_Baypar,paste0(modelPath, '/rlt/mBaypar.csv'))
-write.csv(mm_Baypar_melt,paste0(modelPath, '/rlt/mm_Baypar_se.csv'))
-write.csv(CVslopes,paste0(modelPath, '/rlt/CVslopes.csv'))
-```
-
-
-## ls
+## Mean central tendency indices
 
 ```{r}
 mm_Baypar_melt$wmsize = as.factor(mm_Baypar_melt$wmsize)
@@ -731,11 +705,7 @@ plt_wp <- ggplot(mm_Baypar_melt, aes(Exp, m_wp, ymin = m_wp - se_wp, ymax = m_wp
   labs(x = "", y = TeX("Mean central tendency indices $w_p$"), color = 'Memory Load') +
   theme_new 
 plt_wp
-ggsave(paste0(getwd(), "/figures/plt_wp.png"), plt_wp, width = 4, height = 4)
 ```
-
-
-
 
 
 ```{r}
@@ -751,7 +721,6 @@ plt_InP <- ggplot(mm_Baypar_melt
   theme_new 
 
 plt_InP
-ggsave(paste0(getwd(), "/figures/plt_InP.png"), plt_InP, width = 4, height = 4)
 ```
 
 ```{r}
@@ -766,8 +735,6 @@ plt_InP_fitting <- ggplot(meanInP, aes(Exp, mInP, ymin = mInP - seInP, ymax = mI
   theme_new 
 
 plt_InP_fitting
-ggsave(paste0(getwd(), "/figures/plt_InP_fitting.png"), plt_InP_fitting, width = 4, height = 4)
-
 ```
 
 
@@ -776,13 +743,11 @@ ggsave(paste0(getwd(), "/figures/plt_InP_fitting.png"), plt_InP_fitting, width =
 
 ```{r}
 fig4<-ggarrange(plt_wp, plt_InP,  common.legend = TRUE, ncol=2,   labels = c("a", "b"))
-ggsave(paste0(getwd(), "/", modelPath, "/figures/fig4.png"), fig4, width = 8, height = 4)
 fig4
 ```
 
 
 #  Model prediction error
-
 
 ```{r}
 m_predErr_sub<- m_predY_sub%>% 
@@ -811,7 +776,6 @@ write.csv(m_predErr, paste0(getwd(), "/", modelPath, "/rlt/m_predErr_", modelver
 
 ```{r}
 ggplot(m_predErr_sub, aes(mpredRP_rerr*100, mpredcv_rerr*100, color = WMSize, alpha = .9)) + 
-  #geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
   geom_point() +
   geom_point(data = m_predErr, aes(mmpredRP_rerr*100, mmpredcv_rerr*100, color = WMSize, alpha = .9, size = 1 ))+
   xlab('Relative prediction error in the RP means (%)')+ ylab('Relative prediction error of CV (%)')+colorSet3+

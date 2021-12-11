@@ -17,7 +17,7 @@ runModelparallel = FALSE
 # flag for compile models
 compileModels = FALSE
 # model version
-modelversion = 'linearV1'
+modelversion = 'linear'
 
 ## The definition of the function to run Rstan model locally
 funFitStan <- function(subdat){

@@ -71,6 +71,7 @@ funMergeMRlt <- function(explist, path, version){
   write.csv(Bayparlist, paste0(getwd(), "/", path, "/rlt/AllDat_Bayparlist_", modelversion, ".csv"))
   write.csv(AllDat_predY, paste0( getwd(), "/",path, "/rlt/AllDat_predY_", modelversion, ".csv"))
   write.csv(AllDat_newY, paste0(getwd(), "/",path, "/rlt/AllDat_newY_", modelversion, ".csv"))
+  saveRDS(modelResultAll, file = paste0(getwd(), "/", path, "/rlt/modelResultAll_", modelversion, ".rds")) 
 }
 
 funMergeMRlt(c('Exp1','Exp2','Exp3','Exp4') , modelPath, modelversion)
@@ -112,7 +113,7 @@ WMCrr2 <- ggplot(meanForPlot, aes(WMSize, mean_WMCrr, ymin = mean_WMCrr - se_WMC
   labs(x = "Memory load", y = "Mean correct rates of WM task") +
   theme_new 
 WMCrr2
-#ggsave(paste0(getwd(), "/figures/WMCrr2.png"), WMCrr2, width = 4, height = 4)
+ggsave(paste0(getwd(), "/figures/WMCrr2.png"), WMCrr2, width = 4, height = 4)
 ```
 
 
@@ -236,15 +237,33 @@ for (i in 1: length(mpredY_sub_split1)){
   }
 }
 
+write_csv(mpredY_sub_jasp_RP, paste0(modelPath, '/rlt/RP_Bias_jasp.csv'))
+write_csv(mpredY_sub_jasp_cv, paste0(modelPath, '/rlt/cv_jasp.csv'))
+write_csv(mpredY_sub_jasp_RP1, paste0(modelPath, '/rlt/RP_Bias_jasp1.csv'))
+write_csv(mpredY_sub_jasp_cv1, paste0(modelPath, '/rlt/cv_jasp1.csv'))
 ```
 
 
 ```{r}
+write_csv(dplyr::group_by(mpredY_sub, curDur, NSub) %>%
+  dplyr::summarize(m_cv = mean(cv))%>%spread(curDur, m_cv), paste0(modelPath, '/rlt/m_cv.csv'))
+
+
 mpredY_sub$RP_bias = mpredY_sub$m_repDur -mpredY_sub$curDur
 mpredY_sub_new <- dplyr::group_by(mpredY_sub, curDur, Exp, NSub) %>%
   dplyr::summarize(m_RP_bias = mean(RP_bias))%>% spread(curDur, m_RP_bias)
+
+write_csv(mpredY_sub_new%>%filter(Exp == 'Exp1'), paste0(modelPath, '/rlt/RP_Bias_exp1.csv'))
+write_csv(mpredY_sub_new%>%filter(Exp == 'Exp2'), paste0(modelPath, '/rlt/RP_Bias_exp2.csv'))
+write_csv(mpredY_sub_new%>%filter(Exp == 'Exp3'), paste0(modelPath, '/rlt/RP_Bias_exp3.csv'))
+write_csv(mpredY_sub_new%>%filter(Exp == 'Exp4'), paste0(modelPath, '/rlt/RP_Bias_exp4.csv'))
+
+
 mpredY_sub_WMsize <- dplyr::group_by(mpredY_sub, WMSize, Exp, NSub) %>%
   dplyr::summarize(m_RP_bias = mean(RP_bias))%>% spread(WMSize, m_RP_bias)
+write_csv(mpredY_sub_WMsize%>%filter(Exp == 'Exp3'), paste0(modelPath, '/rlt/RP_Bias_WMsize_exp3.csv'))
+write_csv(mpredY_sub_WMsize%>%filter(Exp == 'Exp4'), paste0(modelPath, '/rlt/RP_Bias_WMsize_exp4.csv'))
+
 ```
 
 
@@ -428,6 +447,7 @@ RP_CV <- ggplot(data= m_predY, aes(x=curDur, y= cv, color=WMSize, shape = as.fac
   labs(x="Duration (s)", y="CV", shape=" ", color = "Memory Load")+ theme_new+
   colorSet3+guides(shape="none")+theme(strip.text.x = element_blank())
 RP_CV
+ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_CV.png"), RP_CV, width = 6, height = 6)
 ```
 
 ## CV slope
@@ -500,6 +520,7 @@ plt_CVslope <- ggplot(mCVslopes, aes(Exp, m_obs_cv_slope, ymin = m_obs_cv_slope 
   theme_new +theme(legend.position="top")
 
 plt_CVslope
+ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_CVslope.png"), plt_CVslope, width = 4, height = 4)
 ```
 
 
@@ -513,13 +534,14 @@ plt_CVIntecept<- ggplot(mCVslopes, aes(Exp, m_obs_cv_Intercept, ymin = m_obs_cv_
   theme_new +theme(legend.position="top")
 
 plt_CVIntecept
+ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_Intercept.png"), plt_CVIntecept, width = 4, height = 4)
 ```
 
 
 ```{r}
 ## Figures in the MS
 fig_CV_slope_Intecept<-ggarrange(plt_CVslope, plt_CVIntecept, common.legend = TRUE, ncol=2, nrow=1,  labels = c("a", "b"))
-#ggsave(paste0(getwd(), "/", modelPath, "/figures/fig_CV_slope_Intecept.png"), fig_CV_slope_Intecept, width = 8, height = 4)
+ggsave(paste0(getwd(), "/", modelPath, "/figures/fig_CV_slope_Intecept.png"), fig_CV_slope_Intecept, width = 8, height = 4)
 fig_CV_slope_Intecept
 ```
 
@@ -530,7 +552,7 @@ fig_CV_slope_Intecept
 ```{r}
 ## Figures in the MS
 fig3<-ggarrange(RP_bias, RP_CV, common.legend = TRUE, ncol=1, nrow=2,  labels = c("a", "b"))
-#ggsave(paste0(getwd(), "/", modelPath, "/figures/fig3.png"), fig3, width = 6, height = 5)
+ggsave(paste0(getwd(), "/", modelPath, "/figures/fig3.png"), fig3, width = 6, height = 5)
 fig3
 ```
 
@@ -569,6 +591,9 @@ Bayparlist$InP_5 = exp((Bayparlist$kr*size + (1-Bayparlist$wp_5)*Bayparlist$ks*s
 
 
 ```{r}
+#log(IP)=[kr*M - (1-w_p)ks*M+sig2_post/2+ w_p*mu_p]/w_p
+#sig2_post = (sigma_pr2 *sig_sm2)/(sigma_pr2 + sig_sm2);
+
 Bayparlist$sig2_post_1 = (Bayparlist$sig_pr2_log *(Bayparlist$sig_s2 +Bayparlist$ls*1))/(Bayparlist$sig_pr2_log + Bayparlist$sig_s2 +Bayparlist$ls*1) *0.5
 
 Bayparlist$sig2_post_3 =(Bayparlist$sig_pr2_log *(Bayparlist$sig_s2 +Bayparlist$ls*3))/(Bayparlist$sig_pr2_log + Bayparlist$sig_s2 +Bayparlist$ls*3) *0.5 
@@ -643,6 +668,8 @@ plt_InP<- ggplot(data = mBaypar_InP%>%filter(Type== "InP_curve"), aes(x= Exp, y=
   xlab(' ')+ylab("Indifferent point (s)")+guides(shape="none")+
   theme(legend.position = "top")
 
+
+ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_InP.png"), plt_InP, width = 3, height = 3)
 plt_InP
 ```
 
@@ -684,9 +711,25 @@ for (i in 1: length(Bayparlist_list)){
   else
     Bayparlist_spss = left_join(Bayparlist_spss, temp, by=c("Exp",  "NSub"))
 }
-
+write_csv(Bayparlist_spss, paste0(modelPath, '/rlt/Bayparlist_spss.csv'))
 ```
 
+```{r include=FALSE}
+# save the model results for spss
+write.csv(m_WAIC, paste0(modelPath, "/rlt/m_WAIC.csv"))
+write.csv(CVslopes, paste0(modelPath, '/rlt/CVslopes.csv'))
+write.csv(CVslopes_spss, paste0(modelPath, '/rlt/Sub_CV_slopes_SPSS.csv'))
+write.csv(mCVslopes, paste0(modelPath, '/rlt/mCVslopes.csv'))
+write.csv(mm_Baypar,paste0(modelPath, '/rlt/mBaypar.csv'))
+write.csv(Baypar_WMSize,paste0(modelPath, '/rlt/Baypar_WMSize.csv'))
+
+
+write_csv(Bayparlist_spss %>% filter(Exp =='Exp2'), paste0(modelPath, '/rlt/Bayparlist_spss_exp2.csv'))
+
+write_csv(Bayparlist_spss %>% filter(Exp =='Exp3'), paste0(modelPath, '/rlt/Bayparlist_spss_exp3.csv'))
+
+write_csv(Bayparlist_spss %>% filter(Exp =='Exp4'), paste0(modelPath, '/rlt/Bayparlist_spss_exp4.csv'))
+```
 
 
 # anova analysis
@@ -758,6 +801,7 @@ plt_wp <- ggplot(mwp, aes(Exp, m_wp, ymin = m_wp - se_wp, ymax = m_wp + se_wp, g
   theme_new + theme(legend.position="top")
 
 plt_wp
+ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_wp.png"), plt_wp, width = 3, height = 3)
 ```
 
 ## combine InP and wp 
@@ -766,7 +810,7 @@ plt_wp
 
 ```{r}
 fig4<-ggarrange(plt_wp, plt_InP, common.legend = TRUE, ncol=2, nrow=1,  labels = c("a", "b"))
-#ggsave(paste0(getwd(), "/", modelPath, "/figures/fig4.png"), fig4, width = 6, height = 3)
+ggsave(paste0(getwd(), "/", modelPath, "/figures/fig4.png"), fig4, width = 6, height = 3)
 fig4
 ```
 
@@ -877,13 +921,41 @@ m_predErr
 ```
 
 
+```{r}
+plt_rErrorScatter = ggplot(m_predErr_sub, aes(mpredRP_rerr*100, mpredcv_rerr*100, color = WMSize, alpha = .9)) + 
+  #geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_rerr*100, mmpredcv_rerr*100, color = WMSize, alpha = .9, size = 1 ))+
+  xlab('Relative prediction error of reproduction mean(%)')+ ylab('Relative prediction error of CV (%)')+colorSet3+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+
+#ggsave(paste0(getwd(), "/", modelPath, "figures/plt_rErrorScatter.png"), plt_rErrorScatter, width = 7, height = 4)
+
+plt_rErrorScatter
+```
+
+
+```{r}
+plt_ErrorScatter = ggplot(m_predErr_sub, aes(mpredRP_err, mpredVar_err, color = WMSize, alpha = .9)) + 
+  geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_err, mmpredVar_err, color = WMSize, alpha = .9, size = 1 ))+
+  xlab('Prediction error in the RP means (s)')+ ylab('Prediction error in the RP variance (s)')+colorSet3+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+
+ggsave(paste0(getwd(), "/", modelPath, "figures/plt_ErrorScatter.png"), plt_ErrorScatter, width = 7, height = 4)
+
+plt_ErrorScatter
+```
 
 # model comparison (logarithmic vs. linear)
 
 ```{r}
 m_predErr_sub$model = 'logarithmic'
 m_predErr$model = 'logarithmic'
-linear_model = 'linear'
+linear_model = 'linearV1'
 m_predErr_linear = read.csv(paste0(getwd(), "/", rstanmodelPath, '/models/', linear_model, "/rlt/m_predErr_", linear_model, ".csv"))
 m_predErr_linear$X = NULL
 m_predErr_sub_linear = read.csv(paste0(getwd(), "/", rstanmodelPath, '/models/', linear_model, "/rlt/m_predErr_sub_", linear_model, ".csv"))
@@ -910,7 +982,7 @@ plt_Err_CV_all = ggplot(m_predErr_all, aes(abs(mmpredRP_err), abs(mmpredcv_err),
          shape = guide_legend(order =2, nrow=2,byrow=TRUE),
             size = guide_legend(order = 3, nrow=3,byrow=TRUE))
 
-#ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_Err_CV_all.png"), plt_Err_CV_all, width = 7, height = 4)
+ggsave(paste0(getwd(), "/", modelPath, "figures/plt_Err_CV_all.png"), plt_Err_CV_all, width = 7, height = 4)
 
 plt_Err_CV_all
 ```
