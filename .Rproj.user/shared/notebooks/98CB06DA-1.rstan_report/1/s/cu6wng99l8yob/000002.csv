@@ -1,0 +1,8 @@
+"0","Baypar_WMSize_melt <- melt(Baypar_WMSize%>%select(""Exp"",""WMSize"",""NSub"", ""InP_Eq"", ""InP_Eq_old"", ""InP_curve""), id.vars = c(""Exp"",""WMSize"",""NSub""),"
+"0","                           variable.name = ""Type"","
+"0","                           value.name = ""InP"" )"
+"0",""
+"0",""
+"0","Baypar_WMSize_melt %>%filter(Type== ""InP_curve"") %>% dplyr::group_by(Exp)%>%"
+"0","  dplyr::summarise(n = n(),"
+"0","                   m_InP = mean(InP), se_InP= sd(InP)/sqrt(n-1))"

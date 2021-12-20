@@ -1,0 +1,27 @@
+{
+    "id": "ECD908A6",
+    "path": "~/mlabRepository/working_memory_reproduction/analysis/1.rstan_report.Rmd",
+    "project_path": "analysis/1.rstan_report.Rmd",
+    "type": "r_markdown",
+    "hash": "1816555103",
+    "contents": "",
+    "dirty": false,
+    "created": 1639997098809.0,
+    "source_on_save": false,
+    "relative_order": 2,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "532,49",
+        "scrollLine": "528",
+        "last_setup_crc32": "AF929A15bb338d19"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1639997707,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1639997707140,
+    "read_only": false,
+    "read_only_alternatives": []
+}

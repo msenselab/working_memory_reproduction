@@ -1,0 +1,8 @@
+"0","mCVslopes <- CVslopes%>% dplyr::group_by(WMSize, Exp) %>%"
+"0","  dplyr::summarize(n =n(),"
+"0","                   m_obs_cv_Intercept = mean(obs_cv_Intercept), "
+"0","                   m_obs_cv_slope = mean(obs_cv_slope),"
+"0","                   se_obs_CV_slope = sd(obs_cv_slope)/sqrt(n-1),"
+"0","                   se_obs_CV_Intercept = sd(obs_cv_Intercept)/sqrt(n-1))"
+"1","`summarise()` has grouped output by 'WMSize'. You can override using the `.groups` argument.
+"

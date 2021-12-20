@@ -1,0 +1,21 @@
+"0","# calculate the slope of the cv curve"
+"0","RPslope_model <- function(df) {"
+"0","  lm(m_repDur ~ log(curDur), data = df)"
+"0","}"
+"0",""
+"0","RPslopes <- mpredY_sub %>% "
+"0","  dplyr::group_by(NSub, Exp, WMSize) %>% nest() %>%"
+"0","  mutate(model = map(data, RPslope_model)) %>% "
+"0","  mutate(slope = map(model, broom::tidy)) %>%  # get estimates"
+"0","  unnest(slope, .drop = TRUE) %>% # remove raw data"
+"0","  select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns"
+"0","  spread(term, estimate) %>%   # spread stimates"
+"0","  dplyr::rename(Intercept = `(Intercept)`, slope = `log(curDur)`)  "
+"2","Warning:"
+"2"," The `.drop` argument of `unnest()` is deprecated as of tidyr 1.0.0.
+All list-columns are now preserved.
+[90mThis warning is displayed once every 8 hours.[39m
+[90mCall `lifecycle::last_warnings()` to see where this warning was generated.[39m
+"
+"0","RPslopes$data <- NULL"
+"0","RPslopes$model <- NULL"

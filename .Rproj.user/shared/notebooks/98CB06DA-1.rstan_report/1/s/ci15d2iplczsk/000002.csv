@@ -1,0 +1,18 @@
+"0","##  anova analyse on observed cv slope"
+"0","ezANOVA(data = CVslopes, dv= obs_cv_slope, wid=NSub, between = .(Exp))"
+"2","Warning:"
+"2"," Converting ""NSub"" to factor for ANOVA.
+"
+"2","Warning:"
+"2"," Converting ""Exp"" to factor for ANOVA.
+"
+"2","Warning:"
+"2"," The column supplied as the wid variable contains non-unique values across levels of the supplied between-Ss variables. Automatically fixing this by generating unique wid labels.
+"
+"2","Warning:"
+"2"," Collapsing data to cell means. *IF* the requested effects are a subset of the full design, you must use the ""within_full"" argument, else results may be inaccurate.
+"
+"2","Coefficient covariances computed by hccm()
+"
+"1","$ANOVA
+"

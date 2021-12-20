@@ -1,0 +1,3 @@
+"0","## Figures in the MS"
+"0","fig3<-ggarrange(RP_bias, RP_CV, common.legend = TRUE, ncol=1, nrow=2,  labels = c(""a"", ""b""))"
+"0","ggsave(paste0(getwd(), ""/"", modelPath, ""/figures/fig3.png""), fig3, width = 6, height = 5)"

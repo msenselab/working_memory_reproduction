@@ -1,0 +1,7 @@
+"0","m_newY <- dplyr::group_by(AllDat_newY, Exp, curDur, WMSize) %>%"
+"0","  dplyr::summarize(m_mu_r = mean(mu_r),"
+"0","                   m_sig_r = mean(sig_r),"
+"0","                   log_lik =mean(log_lik)"
+"0","  )"
+"1","`summarise()` has grouped output by 'Exp', 'curDur'. You can override using the `.groups` argument.
+"

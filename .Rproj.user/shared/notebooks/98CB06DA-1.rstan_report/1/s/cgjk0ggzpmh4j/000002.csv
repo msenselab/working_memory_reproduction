@@ -1,0 +1,7 @@
+"0","#load prediction"
+"0","AllDat_predY <- read.csv(paste0(modelPath, ""/rlt/AllDat_predY_"",modelversion,"".csv""))"
+"0","AllDat_predY$WMSize <- as.factor(AllDat_predY$WMSize)"
+"0","levels(AllDat_predY$WMSize) = c(""low"", ""medium"",  ""high"")"
+"0","AllDat_predY$pred_Bias = AllDat_predY$mu_r - AllDat_predY$curDur"
+"0","AllDat_predY$predErr = AllDat_predY$mu_r - AllDat_predY$repDur"
+"0","AllDat_predY$relatErr = AllDat_predY$predErr / AllDat_predY$repDur"

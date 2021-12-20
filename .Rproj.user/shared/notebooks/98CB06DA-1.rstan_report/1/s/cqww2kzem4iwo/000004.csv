@@ -1,0 +1,6 @@
+"0",""
+"0","Bayparlist$InP_old_1 = exp((Bayparlist$kr*size - (1-Bayparlist$wp_1)*Bayparlist$ks*size +(Bayparlist$sig_pr2_log *(Bayparlist$sig_s2 +Bayparlist$ls*1))/(Bayparlist$sig_pr2_log + Bayparlist$sig_s2 +Bayparlist$ls*1) *0.5 + Bayparlist$wp_1* Bayparlist$mu_pr_log)/Bayparlist$wp_1)"
+"0",""
+"0","Bayparlist$InP_old_3 = exp((Bayparlist$kr*size - (1-Bayparlist$wp_3)*Bayparlist$ks*size +(Bayparlist$sig_pr2_log *(Bayparlist$sig_s2 +Bayparlist$ls*3))/(Bayparlist$sig_pr2_log + Bayparlist$sig_s2 +Bayparlist$ls*3) *0.5 + Bayparlist$wp_3* Bayparlist$mu_pr_log)/Bayparlist$wp_3)"
+"0",""
+"0","Bayparlist$InP_old_5 = exp((Bayparlist$kr*size - (1-Bayparlist$wp_5)*Bayparlist$ks*size +(Bayparlist$sig_pr2_log *(Bayparlist$sig_s2 +Bayparlist$ls*5))/(Bayparlist$sig_pr2_log + Bayparlist$sig_s2 +Bayparlist$ls*5) *0.5 + Bayparlist$wp_5* Bayparlist$mu_pr_log)/Bayparlist$wp_5)"
