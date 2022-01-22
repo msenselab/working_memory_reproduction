@@ -839,7 +839,6 @@ ezANOVA(data = CVslopes, dv= obs_cv_slope, wid=NSub, between = .(Exp))
 
 # Model prediction error
 
-
 ```{r}
 m_predErr_sub<- mpredY_sub%>% 
   dplyr::group_by(Exp, WMSize, NSub) %>% dplyr::summarise(
@@ -863,7 +862,7 @@ m_predErr
 
 
 
-# model comparison (logarithmic vs. linear)
+# Model comparison (logarithmic vs. linear)
 
 ```{r}
 m_predErr_sub$model = 'logarithmic'

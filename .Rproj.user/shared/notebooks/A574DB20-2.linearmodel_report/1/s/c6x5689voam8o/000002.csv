@@ -1,0 +1,5 @@
+"0","options(mc.cores = parallel::detectCores()-1)"
+"0","rstan_options (auto_write=TRUE)"
+"0","rstanmodelPath = 'modelrlt'"
+"0","modelPath = paste0(rstanmodelPath, '/models/', modelversion)"
+"0","library(ggpubr)"

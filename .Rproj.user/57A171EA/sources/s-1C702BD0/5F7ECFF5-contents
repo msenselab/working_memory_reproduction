@@ -1,0 +1,761 @@
+---
+title: "Results of Logarithmic encoding model"
+author: "Fiona Zhu"
+date: "15/7/2020"
+output:
+  html_document:
+    df_print: paged
+    number_sections: true
+  pdf_document: 
+    number_sections: true
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r include=FALSE}
+# Load the packages and include functions
+source('rstan_linear.R') # final 
+library(rlist)
+library(ez)
+library(tidyverse)
+library(latex2exp)
+library(lsr)
+library(rticles)
+library(DescTools)
+library(heplots)
+library(lme4)
+library(rstatix)
+library(boot)
+library(ggpubr)
+library(reshape2)
+sizeInModel <- c(1, 2, 3)
+colorSet3 <- scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9")) 
+colorSet4 <- scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9", "#1a9641")) 
+colorSet <- scale_color_manual(values=c("#d7191c", "#fdae61", "#a6d96a", "#1a9641")) 
+```
+
+
+
+Note that the WMSize in models are using 1, 2, 3 instead of 1,3,5.
+
+
+
+```{r include=FALSE}
+options(mc.cores = parallel::detectCores()-1)
+rstan_options (auto_write=TRUE)
+rstanmodelPath = 'modelrlt'
+modelPath = paste0(rstanmodelPath, '/models/', modelversion)
+library(ggpubr)
+```
+
+
+```{r include=FALSE}
+#customize theme
+theme_new <- theme_bw() + 
+  theme(panel.border = element_blank(), 
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        strip.background = element_rect(color = "white", 
+                                        fill = "white"),
+        panel.grid = element_blank())
+```
+
+
+
+```{r include=FALSE}
+## read data
+dat = data.frame()
+readCSV <- function(fn){
+  filename = paste0("../data/","Exp",toString(fn),".csv")
+  read.csv(filename) %>% mutate(Exp = fn)
+}
+
+dat <- map_df(1:4, readCSV)
+dur <- sort(unique(dat$curDur))
+AllExpData <- dat %>% filter(valid == 1)
+AllExpData$Exp = paste0('Exp', AllExpData$Exp)
+```
+
+# Corrct rate
+
+```{r}
+#plot WM correct rates
+AllExpData$WMCrr <- AllExpData$TPresent == AllExpData$WMRP
+wmPlotData <- dplyr::group_by(AllExpData, Exp, WMSize, NSub) %>% 
+  dplyr::summarize(m_WMCrr = mean(WMCrr), n = n(), se_WMCrr = sd(WMCrr)/sqrt(n-1))
+wmPlotData%>%dplyr::group_by(Exp, WMSize)%>%
+  dplyr::summarize( n = n(),
+             mean_WMCrr = mean(m_WMCrr), se_WMCrr = sd(m_WMCrr)/sqrt(n-1) ) -> meanForPlot
+```
+
+```{r}
+meanForPlot$WMSize <- factor(meanForPlot$WMSize, labels = c("low", "medium",  "high")) 
+WMCrr2 <- ggplot(meanForPlot, aes(WMSize, mean_WMCrr, ymin = mean_WMCrr - se_WMCrr, ymax = mean_WMCrr + se_WMCrr,
+                                  group =Exp, color = Exp, fill = Exp))+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  coord_cartesian(ylim = c(0.5, 1)) +
+  colorSet4+
+  labs(x = "Memory load", y = "Mean correct rates of WM task") +
+  theme_new 
+WMCrr2
+```
+
+
+
+```{r}
+### generate WM correct rates
+dat$WMCrr <- dat$TPresent == dat$WMRP
+m_wmp<- dplyr::group_by(dat, Exp, WMSize, NSub) %>% 
+  dplyr::summarize(m_WMCrr = mean(WMCrr), n =n(), se_WMCrr = sd(WMCrr)/sqrt(n-1))
+
+```
+
+
+
+# Merge the Result data
+```{r include=FALSE}
+#To preprocess the model result data, and merge different model version data together.
+#function to merge the model result data
+
+funMergeMRlt <- function(explist, path, version){
+  rltfilename <- {}
+  rltfilename <- c(rltfilename, paste0("rlt_", explist, ".rds"))
+  AllDat_Bayparlist <- {}
+  AllDat_predY <- {}
+  AllDat_newY <- {}
+  modelResultAll <- list()
+  merge.data.all <- {}
+  merge.data <- readRDS(file.path(paste0( getwd(), "/", path, "/rlt/", rltfilename[1])))
+  for (i in 1:length(merge.data)){
+    modelResultAll <- list.append(modelResultAll, merge.data[[i]])
+    AllDat_Bayparlist <- rbind(AllDat_Bayparlist, merge.data[[i]]$Baypar)
+    AllDat_predY <- rbind(AllDat_predY, merge.data[[i]]$PredY_list)
+    AllDat_newY<- rbind(AllDat_newY, merge.data[[i]]$NewY_list)
+  }
+  
+  if (length(rltfilename) >= 2) {
+    for (i in 2:length(rltfilename)){
+      new.data = readRDS(file.path(paste0(getwd(), "/", path, "/rlt/", rltfilename[i])))
+      for (j in 1:length(new.data)){
+        modelResultAll <- list.append(modelResultAll, new.data[[j]])
+        AllDat_Bayparlist <- rbind(AllDat_Bayparlist, new.data[[j]]$Baypar)
+        AllDat_predY <- rbind(AllDat_predY, new.data[[j]]$PredY_list)
+        AllDat_newY<- rbind(AllDat_newY, new.data[[j]]$NewY_list)
+      }
+    }
+  }
+  write.csv(AllDat_Bayparlist, paste0(getwd(), "/", path, "/rlt/AllDat_Bayparlist_", modelversion, ".csv"))
+  write.csv(AllDat_predY, paste0( getwd(), "/",path, "/rlt/AllDat_predY_", modelversion, ".csv"))
+  write.csv(AllDat_newY, paste0(getwd(), "/",path, "/rlt/AllDat_newY_", modelversion, ".csv"))
+}
+
+```
+
+
+
+```{r include=FALSE}
+needmerge = 1
+models_to_merge <- c('Exp1','Exp2','Exp3','Exp4') 
+if (needmerge == 1){
+  funMergeMRlt(models_to_merge, modelPath, modelversion)
+}
+```
+
+# Behavior data
+
+```{r include=FALSE}
+m_obsevY <- dplyr::group_by(AllExpData, curDur, WMSize, Exp, NSub) %>%
+  dplyr::summarize(m_repDur = mean(repDur), 
+            sd_repDur = sd(repDur))
+m_obsevY$bias_repDur <- m_obsevY$m_repDur - m_obsevY$curDur
+m_obsevY$RP_CV <- m_obsevY$sd_repDur/m_obsevY$m_repDur
+#change the table struction of correct rates
+obsevY_list <-split(m_obsevY, m_obsevY$WMSize) 
+obsevRP_list = NULL
+for (i in 1: length(obsevY_list)){
+  temp = obsevY_list[[i]]
+  wmsize = unique(temp$WMSize)
+  temp$WMSize = NULL
+  colnames(temp) = c('curDur', 'Exp',  'NSub', paste0('m_repDur_',wmsize), paste0('sd_repDur_',wmsize), paste0('bias_repDur_',wmsize), paste0('RP_CV_',wmsize))
+  if(i == 1)
+    obsevRP_list = temp
+  else
+    obsevRP_list = left_join(obsevRP_list, temp, by=c("curDur","Exp",  "NSub"))
+}
+```
+
+
+
+```{r include=FALSE}
+### load model result data
+AllDat_Bayparlist <- read_csv(paste0(modelPath, "/rlt/AllDat_Bayparlist_",modelversion,".csv"))
+AllDat_predY <- read_csv(paste0(modelPath, "/rlt/AllDat_predY_",modelversion,".csv"))
+AllDat_newY <- read_csv(paste0(modelPath, "/rlt/AllDat_newY_",modelversion,".csv"))
+```
+
+
+# WAIC and LOO-CV
+```{r}
+m_WAIC <- dplyr::group_by(AllDat_Bayparlist, Exp, model) %>%
+  dplyr::summarize(m_looic = mean(looic),
+                   m_waic = mean(waic),
+                   n = n(),
+                   se_waic = sd(waic)/sqrt(n-1),
+                   se_looic = sd(looic)/sqrt(n-1),
+                   m_p_loo = mean(p_loo),
+                   m_elpd_loo = mean(elpd_loo),
+                   m_se_looic = mean(se_looic),
+                   m_se_p_loo = mean(se_p_loo),
+                   m_p_waic = mean(p_waic),
+                   m_se_waic = mean(se_waic)) 
+m_WAIC
+```
+
+
+# Parameters for each subject
+
+```{r}
+m_Bayparlist <- dplyr::group_by(AllDat_Bayparlist, Exp) %>%
+  dplyr::summarize(n = n(),
+                   sig_s = mean(sig_s),
+                   ks = mean(ks),
+                   ls = mean(ls),
+                   kr = mean(kr),
+                   sig_pr2 = mean(sig_pr2),
+                   sig_mn =mean(sig_mn))
+m_Bayparlist
+```
+
+
+
+```{r}
+Bayparlist <- dplyr::group_by(AllDat_Bayparlist, Nsub, Exp, model) %>%
+  dplyr::summarize(sig_s = mean(sig_s), ks = mean(ks),
+                   ls = mean(ls),
+                   kr = mean(kr),
+                   mu_pr = mean(mu_pr),
+                   sig_pr2 = mean(sig_pr2),
+                   sig_mn =mean(sig_mn)) 
+
+Bayparlist$ls_1 = 1- sizeInModel[2]* Bayparlist$ls
+Bayparlist$ls_3 = 1- Bayparlist$ls *sizeInModel[2]
+Bayparlist$ls_5 = 1- Bayparlist$ls *sizeInModel[3]
+
+Bayparlist$ks_1 = 1+ Bayparlist$ks *sizeInModel[1]
+Bayparlist$ks_3 = 1+ Bayparlist$ks*sizeInModel[2]
+Bayparlist$ks_5 = 1+ Bayparlist$ks*sizeInModel[3]
+
+Bayparlist$kr_1 = 1 + Bayparlist$kr*sizeInModel[1]
+Bayparlist$kr_3 = 1 + Bayparlist$kr*sizeInModel[2]
+Bayparlist$kr_5 = 1 + Bayparlist$kr*sizeInModel[3]
+
+head(Bayparlist)
+```
+
+
+# Prediction results
+
+```{r include=FALSE}
+predY <- dplyr::group_by(AllDat_predY, curDur, Exp, NSub, model, WMSize) %>%
+  dplyr::summarize(m_repDur = mean(repDur), wp =mean(wp),
+            n = n(), 
+            se_repDur = sd(repDur)/ sqrt(n-1),
+            mpredY = mean(predY), 
+            sig_wm2 = mean(sig_wm2),
+            se_predY = sd(predY)/ sqrt(n-1)
+  )
+
+predY$m_repDurErr = predY$mpredY - predY$m_repDur
+predY$m_relativeErr = predY$m_repDurErr / predY$curDur
+```
+
+```{r}
+WM_wp = dplyr::group_by(predY, Exp, NSub, WMSize) %>%
+  dplyr::summarize(wp =mean(wp), sig_wm2 =mean(sig_wm2) )
+
+m_wmp$Exp= paste0('Exp', m_wmp$Exp)
+m_wmp = left_join(m_wmp, WM_wp, by=c("Exp", "NSub", "WMSize"))
+
+#change the table struction of correct rates
+wmp_list <-split(m_wmp, m_wmp$WMSize) 
+```
+
+```{r}
+WMCrr_list = NULL
+for (i in 1: length(wmp_list)){
+  temp = wmp_list[[i]]
+  wmsize = unique(temp$WMSize)
+  temp$WMSize = NULL
+  temp$n = NULL
+  colnames(temp) = c('Exp',  'NSub', paste0('m_WMCrr_',wmsize), paste0('se_WMCrr_',wmsize), paste0('wp_',wmsize), paste0('sig_post2_',wmsize))
+  if(i == 1){
+    WMCrr_list = temp
+  }else{
+    WMCrr_list = left_join(WMCrr_list, temp, by=c("Exp",  "NSub"))
+  }
+}
+```
+
+
+
+```{r}
+names(WMCrr_list)[names(WMCrr_list) == 'NSub'] <- 'Nsub'
+Bayparlist <-  left_join(Bayparlist, WMCrr_list, by= c('Exp', 'Nsub'))
+####  indifferent points calculated by the equation for linear model
+
+Bayparlist$InP_1 <- Bayparlist$wp_1* Bayparlist$mu_pr *(1+Bayparlist$kr*sizeInModel[1])/ (1+(1+Bayparlist$kr*sizeInModel[1])*(1-Bayparlist$wp_1)*(Bayparlist$ks*sizeInModel[1]-1))
+
+
+Bayparlist$InP_3 <- Bayparlist$wp_3* Bayparlist$mu_pr *(1+Bayparlist$kr*sizeInModel[2])/ (1+(1+Bayparlist$kr*sizeInModel[2])*(1-Bayparlist$wp_3)*(Bayparlist$ks*sizeInModel[2]-1))
+
+Bayparlist$InP_5 <- Bayparlist$wp_5* Bayparlist$mu_pr *(1+Bayparlist$kr*sizeInModel[3])/ (1+(1+Bayparlist$kr*sizeInModel[3])*(1-Bayparlist$wp_5)*(Bayparlist$ks*sizeInModel[3]-1))
+```
+
+
+# Average Paremeters 
+```{r}
+mm_Baypar <- dplyr::group_by(Bayparlist, Exp) %>% #WMSize
+  dplyr::summarize(sig_s = mean(sig_s), sig_pr2 = mean(sig_pr2),
+                   ks= mean(ks), kr = mean(kr), 
+                   ls = mean(ls), 
+                   mu_pr =mean(mu_pr),
+                   sig_mn =mean(sig_mn),
+                   InP_1 = mean(InP_1),
+                   InP_3 = mean(InP_3),
+                   InP_5 = mean(InP_5)) 
+mm_Baypar
+```
+
+
+```{r}
+#the mean and standard error of indifferent point calculated based on equation 11 in manuscript
+mean_Baypar <- dplyr::group_by(Bayparlist, Exp) %>% #WMSize
+  dplyr::summarize(m_InP_1 = mean(InP_1), 
+                   m_InP_3 = mean(InP_1),
+                   m_InP_5 = mean(InP_5),
+                   n= n(),
+                   se_InP_1 = sd(InP_1)/sqrt(n-1), 
+                   se_InP_3 = sd(InP_1)/sqrt(n-1),
+                   se_InP_5 = sd(InP_5)/sqrt(n-1))
+mean_Baypar
+```
+
+
+
+# Analysis on the Rstan model parameters
+
+
+```{r include=FALSE}
+AllDat_predY$WMSize <- factor(AllDat_predY$WMSize, labels = c("low", "medium",  "high")) 
+AllDat_newY$WMSize <- factor(AllDat_newY$WMSize, labels = c("low", "medium",  "high"))
+m_newY <- dplyr::group_by(AllDat_newY, Exp, curDur, WMSize) %>%
+  dplyr::summarize(m_predY = mean(predY),
+            m_sig_r =mean(sig_r),
+            m_mu_r = mean(mu_r), 
+            log_lik =mean(log_lik),
+            n = n(),
+            se_predY = sd(predY)/sqrt(n-1),
+            se_sig_r = sd(sig_r)/sqrt(n-1),
+            se_mu_r = sd(mu_r)/sqrt(n-1)
+  )
+m_newY$bias_predDur <- m_newY$m_mu_r - m_newY$curDur
+AllDat_predY$mu_r_linear <- exp(log(AllDat_predY$mu_r) -1/2*log(1+AllDat_predY$sig_r/AllDat_predY$mu_r^2)) 
+```
+
+
+
+
+
+```{r include=FALSE}
+m_predY_sub <- dplyr::group_by(AllDat_predY, curDur, WMSize, Exp, NSub) %>%
+  dplyr::summarize(m_repDur = mean(repDur), 
+            n = n(), 
+            sd_repDur = sd(repDur),
+            m_mu_r = mean(mu_r), 
+            m_sig_r = mean(sig_r),
+            m_wp = mean(wp),
+            m_sig_wm2 = mean(sig_wm2),
+            log_lik =mean(log_lik),
+            predRP_err = mean(mu_r-repDur),
+            predVar_err = mean(sig_r-sd_repDur),
+            predRP_rerr = mean(abs(mu_r-m_repDur)/m_repDur),
+            predVar_rerr = mean(abs(sig_r-sd_repDur)/sd_repDur),
+            cv = sd_repDur/m_repDur,
+            pred_cv = mean(sig_r/mu_r),
+            predcv_err = pred_cv-cv,
+            predcv_rerr = mean(abs(pred_cv-cv)/cv) )
+
+m_predY <- m_predY_sub %>%
+  dplyr::group_by(Exp, curDur, WMSize) %>% 
+  dplyr::summarize(n = n(),
+            m_m_repDur = mean(m_repDur),
+            se_m_repDur = sd(m_repDur) /sqrt(n-1),
+            m_sd_repDur = mean(sd_repDur), 
+            m_m_sig_r =mean(m_sig_r),
+            se_sig_r = sd(m_sig_r)/sqrt(n-1),
+            m_m_mu_r = mean(m_mu_r),
+            m_m_wp = mean(m_wp),
+            cv = mean(cv),
+            pred_cv = mean(pred_cv),
+            m_m_sig_wm2 = mean(m_sig_wm2),
+            log_lik =mean(log_lik),
+            mpredRP_err = mean(predRP_err),
+            mpredVar_err = mean(predVar_err),
+            mpredRP_rerr = mean(predRP_rerr),
+            mpredVar_rerr = mean(predVar_rerr), 
+            mpredcv_err = mean(predcv_err),
+            mpredcv_rerr = mean(predcv_rerr))
+m_predY$bias_repDur <- m_predY$m_m_repDur - m_predY$curDur
+```
+
+## Estimated Indifference Point
+
+```{r}
+mRep_model <- function(df) {
+  lm(predY ~ curDur, data = df)
+}
+
+slopes <- AllDat_predY %>% 
+  dplyr::group_by(NSub, Exp, WMSize) %>% nest()  %>%  # nested data
+  mutate(model = map(data, mRep_model)) %>%  # linear regression
+  mutate(slope = map(model, broom::tidy)) %>%  # get estimates
+  unnest(slope, .drop = TRUE) %>% # remove raw data
+  select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns
+  spread(term, estimate) %>%   # spread stimates
+  dplyr::rename(Intercept = `(Intercept)`, slope = curDur)  # rename columns
+slopes$data = NULL
+slopes$model = NULL
+slopes$inP = slopes$Intercept/(1-slopes$slope)
+```
+
+
+```{r}
+#change the table struction of slopes for spss
+slopes_list <-split(slopes, slopes$WMSize) 
+slopes_spss = NULL
+for (i in 1: length(slopes_list)){
+  temp = slopes_list[[i]]
+  wmsize = unique(temp$WMSize)
+  temp$WMSize = NULL
+  colnames(temp) = c('Exp',  'NSub', paste0('Intercept_',wmsize), paste0('slope_',wmsize), paste0('inP_',wmsize))
+  if(i == 1)
+    slopes_spss = temp
+  else
+    slopes_spss = left_join(slopes_spss, temp, by=c("Exp",  "NSub"))
+}
+```
+
+
+
+```{r}
+#### Anova for estimated indifference points 
+InPAnova <- ezANOVA(data = slopes, dv= inP, wid=NSub, within=.(WMSize), between = .(Exp))
+InPAnova
+```
+
+
+
+
+```{r}
+meanInP  <- dplyr::group_by(slopes, Exp, WMSize) %>%
+  dplyr::summarise(mInP = mean(inP), n =n(), seInP = sd(inP)/sqrt(n-1))
+meanInP
+```
+
+```{r}
+#### Anova for estimated indifference points 
+InPAnova_exp3 <- ezANOVA(data = slopes%>%filter(Exp =='Exp3'), dv= inP, wid=NSub, within=.(WMSize))
+InPAnova_exp3
+```
+
+```{r}
+#### Anova for estimated indifference points for Exp1
+InPAnova_exp1 <- ezANOVA(data = slopes%>%filter(Exp =='Exp1'), dv= inP, wid=NSub, within=.(WMSize))
+InPAnova_exp1
+```
+
+
+
+
+
+```{r}
+#### replot Figure 3 in the MS
+RP  <- ggplot(data = m_predY, aes(x = curDur, y = m_m_mu_r, color=WMSize, group = WMSize, shape = as.factor('Prediction'))) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data= m_newY, aes(x=curDur, y=m_mu_r, color=WMSize)) +
+  #geom_line(data= m_newY, aes(x=curDur, y=m_predY, color=WMSize)) +
+  geom_point(data = m_predY, aes(x = curDur, y = m_m_repDur,  color=WMSize, shape = as.factor('Observation')),alpha = 0.5)+
+  geom_abline(slope=1, intercept=0)+
+  facet_grid(cols = vars(Exp)) +
+  labs(x="", y="Reproduction (s)", shape=" ", color = "Memory Load")+
+  theme_new+colorSet3
+RP
+```
+
+```{r}
+curDurItem <- unique(m_predY$curDur)
+RP_CV <- ggplot(data= m_predY, aes(x=curDur, y= m_sd_repDur/m_m_repDur, color=WMSize, shape = as.factor('Observation'))) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data = m_newY, aes(x=curDur, y=m_sig_r/m_predY, color=WMSize)) +
+  geom_point(data= m_newY %>% filter(curDur %in% curDurItem), aes(x=curDur, y=m_sig_r/m_predY, color=WMSize,  shape = as.factor('Prediction')),alpha = 0.5) +
+  facet_grid(~Exp) +
+  labs(x="Sample intervals (s)", y=" CV (s)", shape=" ", color = "Memory Load")+ theme_new+
+  theme(strip.background = element_blank(),
+        strip.text.x = element_blank())+
+  colorSet3
+RP_CV
+```
+
+
+```{r}
+# calculate the slope of the cv curve
+cvSlope_model <- function(df) {
+  lm(log(cv) ~ curDur_log, data = df)
+}
+
+mpredY <- dplyr::group_by(AllDat_predY, curDur, WMSize, Exp, NSub) %>%
+  dplyr::summarize(m_repDur = mean(repDur), 
+            n = n(), 
+            sd_repDur = sd(repDur),
+            mpredY = mean(predY), 
+            sd_predY = sd(predY),
+            m_mu_r = mean(mu_r), 
+            m_sig_r = mean(sig_r),
+            m_wp = mean(wp),
+            m_sig_wm2 = mean(sig_wm2),
+            log_lik =mean(log_lik))
+mpredY$cv <- mpredY$sd_repDur/mpredY$m_repDur
+
+
+mpredY$curDur_log <- log(mpredY$curDur)
+CVslopes <- mpredY %>% 
+  dplyr::group_by(NSub, Exp, WMSize) %>% nest()  %>%  # nested data
+  mutate(model = map(data, cvSlope_model)) %>%  # linear regression
+  mutate(slope = map(model, broom::tidy)) %>%  # get estimates
+  unnest(slope, .drop = TRUE) %>% # remove raw data
+  select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns
+  spread(term, estimate) %>%   # spread stimates
+  dplyr::rename(Intercept = `(Intercept)`, slope = curDur_log)  # rename columns
+CVslopes$data <- NULL
+CVslopes$model <- NULL
+
+#change the table struction of slopes for spss
+CVslopes_list <-split(CVslopes, CVslopes$WMSize) 
+CVslopes_spss = NULL
+for (i in 1: length(CVslopes_list)){
+  temp = CVslopes_list[[i]]
+  wmsize = unique(temp$WMSize)
+  temp$WMSize = NULL
+  colnames(temp) = c('Exp',  'NSub', paste0('Intercept_',wmsize), paste0('CV_Slope_',wmsize))
+  if(i == 1)
+    CVslopes_spss = temp
+  else
+    CVslopes_spss = left_join(CVslopes_spss, temp, by=c("Exp",  "NSub"))
+}
+
+mCVslopes <- CVslopes%>% dplyr::group_by(WMSize, Exp) %>%
+  dplyr::summarize(m_Intercept = mean(Intercept), 
+            m_slope = mean(slope),
+            n = n(), 
+            se_slope = sd(slope)/sqrt(n-1),
+            se_Intercept = sd(Intercept)/sqrt(n-1))
+
+plt_CVslope <- ggplot(mCVslopes, aes(Exp, m_slope, ymin = m_slope - se_slope, ymax = m_slope + se_slope, group =interaction(Exp, WMSize), color = factor(WMSize)), shape = factor(WMSize))+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  #coord_cartesian(ylim = c(0.5, 1)) +
+  colorSet4+
+  labs(x = "", y = TeX("Mean slope of CV curve"), color = 'Memory Load') +
+  theme_new 
+plt_CVslope
+
+```
+
+```{r}
+RP_CV_slope <- ggplot(data= m_predY, aes(x=log(curDur), y= log(m_sd_repDur/m_m_repDur) , color=WMSize, shape = as.factor('Observation'))) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_abline(data = mCVslopes, aes(intercept = m_Intercept, slope = m_slope, color=WMSize)) +
+  facet_grid(~Exp) +
+  labs(x="logarithmic duration (s)", y=" logarithmic CV", shape=" ", color = "Memory Load")+
+  theme_new+
+  theme(strip.background = element_blank(),
+        strip.text.x = element_blank())+
+  colorSet3 +xlim(-0.8, 0.6)
+RP_CV_slope
+```
+
+## Estimation of parameters in our proposed model
+
+```{r}
+colnames  = c("sig_s","ks", "ls","kr", "mu_pr", "sig_pr2", "sig_mn", "waic", "wbic")
+Bayparlist_subset = Bayparlist[,!names(Bayparlist) %in% colnames]
+
+melt_columns <- c("ls", "ks", "kr", "WMCrr", "wp", "sig_post2", "InP", "se_WMCrr")
+Bayparlist_melt <- Bayparlist_subset %>%
+  unite(newcol1, ls_1, ks_1, kr_1, m_WMCrr_1, wp_1, sig_post2_1, InP_1, se_WMCrr_1)%>%
+  unite(newcol3, ls_3, ks_3, kr_3, m_WMCrr_3, wp_3, sig_post2_3, InP_3, se_WMCrr_3)%>%
+  unite(newcol5, ls_5, ks_5, kr_5, m_WMCrr_5, wp_5, sig_post2_5, InP_5, se_WMCrr_5)%>%
+  melt(id.vars = c("Nsub", "Exp", "model")) %>%
+  dplyr::rename(
+    wmsize = variable,
+    newcol = value
+  )%>%
+  separate(newcol, melt_columns, sep = "_")
+
+Bayparlist_melt$wmsize = substring(Bayparlist_melt$wmsize, 7,7)
+Bayparlist_melt$wmsize = as.factor(Bayparlist_melt$wmsize)
+
+for (mycolumn in melt_columns) {
+  Bayparlist_melt[,mycolumn] = as.numeric(Bayparlist_melt[,mycolumn])
+}
+
+
+mm_Baypar_melt <- Bayparlist_melt %>% 
+  dplyr::group_by(Exp, wmsize) %>%
+  dplyr::summarise(m_ls = mean(ls),   ###here ls is multified with working load size
+                   n = n(), 
+                   se_ls = sd(ls)/ sqrt(n-1),
+                   m_ks = mean(ks), 
+                   se_ks = sd(ks)/ sqrt(n-1),
+                   m_kr = mean(kr), 
+                   se_kr = sd(kr)/ sqrt(n-1),
+                   m_WMCrr = mean(WMCrr), 
+                   se_WMCrr = sd(WMCrr)/ sqrt(n-1),
+                   m_wp = mean(wp), 
+                   se_wp = sd(wp)/ sqrt(n-1),
+                   m_sig_post2 = mean(sig_post2), 
+                   se_sig_post2 = sd(sig_post2)/ sqrt(n-1),
+                   m_InP = mean(InP), 
+                   se_InP = sd(InP)/ sqrt(n-1))
+
+```
+
+
+## Mean central tendency indices
+
+```{r}
+mm_Baypar_melt$wmsize = as.factor(mm_Baypar_melt$wmsize)
+mm_Baypar_melt$Exp = as.factor(mm_Baypar_melt$Exp)
+levels(mm_Baypar_melt$wmsize) <- c("Low", "Medium", "High")
+plt_wp <- ggplot(mm_Baypar_melt, aes(Exp, m_wp, ymin = m_wp - se_wp, ymax = m_wp + se_wp, group =interaction(Exp, wmsize), color = factor(wmsize)), shape = factor(wmsize))+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  #coord_cartesian(ylim = c(0.5, 1)) +
+  colorSet4+
+  labs(x = "", y = TeX("Mean central tendency indices $w_p$"), color = 'Memory Load') +
+  theme_new 
+plt_wp
+```
+
+
+```{r}
+#plot indifferent points mean and error bar (based on the results calculated by equation)
+plt_InP <- ggplot(mm_Baypar_melt 
+                  , aes(Exp, m_InP, ymin = m_InP - se_InP, ymax = m_InP + se_InP, group =interaction(Exp, wmsize), color = factor(wmsize)), shape = factor(wmsize))+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  #coord_cartesian(ylim = c(0.5, 1)) +
+  colorSet4+
+  labs(x = "", y = TeX("Mean indifferent points"), color = 'Memory Load') +
+  theme_new 
+
+plt_InP
+```
+
+```{r}
+#plot indifferent points mean and error bar (fitting curve results)
+plt_InP_fitting <- ggplot(meanInP, aes(Exp, mInP, ymin = mInP - seInP, ymax = mInP + seInP, group =interaction(Exp, WMSize), color = factor(WMSize)), shape = factor(WMSize))+ 
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  #coord_cartesian(ylim = c(0.5, 1)) +
+  colorSet4+
+  labs(x = "", y = TeX("Mean indifferent points"), color = 'Memory Load') +
+  theme_new 
+
+plt_InP_fitting
+```
+
+
+
+
+
+```{r}
+fig4<-ggarrange(plt_wp, plt_InP,  common.legend = TRUE, ncol=2,   labels = c("a", "b"))
+fig4
+```
+
+
+#  Model prediction error
+
+```{r}
+m_predErr_sub<- m_predY_sub%>% 
+  dplyr::group_by(Exp, WMSize, NSub) %>% dplyr::summarise(
+    mpredRP_err=mean(predRP_err),
+    mpredVar_err=mean(predVar_err),
+    mpredRP_rerr = mean(predRP_rerr),
+    mpredVar_rerr = mean(predVar_rerr),
+    mpredcv_rerr = mean(predcv_rerr),
+    mpredcv_err = mean(predcv_err))
+
+m_predErr<- m_predY%>% 
+  dplyr::group_by(Exp, WMSize) %>% dplyr::summarise(
+    mmpredRP_err=mean(mpredRP_err),
+    mmpredVar_err=mean(mpredVar_err),
+    mmpredRP_rerr = mean(mpredRP_rerr),
+    mmpredVar_rerr = mean(mpredVar_rerr),
+    mmpredcv_rerr = mean(mpredcv_rerr),
+    mmpredcv_err = mean(mpredcv_err))
+m_predErr_sub$model = 'linear'
+m_predErr$model = 'linear'
+write.csv(m_predErr_sub, paste0(getwd(), "/", modelPath, "/rlt/m_predErr_sub_", modelversion, ".csv"))
+write.csv(m_predErr, paste0(getwd(), "/", modelPath, "/rlt/m_predErr_", modelversion, ".csv"))
+```
+
+
+```{r}
+ggplot(m_predErr_sub, aes(mpredRP_rerr*100, mpredcv_rerr*100, color = WMSize, alpha = .9)) + 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_rerr*100, mmpredcv_rerr*100, color = WMSize, alpha = .9, size = 1 ))+
+  xlab('Relative prediction error in the RP means (%)')+ ylab('Relative prediction error of CV (%)')+colorSet3+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+```
+
+
+
+```{r}
+plt_rErrorScatter = ggplot(m_predErr_sub, aes(mpredRP_rerr*100, mpredVar_rerr*100, color = WMSize, alpha = .9)) + 
+  #geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_rerr*100, mmpredVar_rerr*100, color = WMSize, alpha = .9, size = 1 ))+
+  xlab('Relative prediction error in the RP means (%)')+ ylab('Relative prediction error in the RP variance (%)')+colorSet3+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+
+plt_rErrorScatter
+```
+
+
+```{r}
+plt_ErrorScatter = ggplot(m_predErr_sub, aes(mpredRP_err, mpredVar_err, color = WMSize, alpha = .9)) + 
+  geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_err, mmpredVar_err, color = WMSize, alpha = .9, size = 1 ))+
+  xlab('Prediction error in the RP means (ms)')+ ylab('Prediction error in the RP variance (ms)')+colorSet3+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+
+plt_ErrorScatter
+```
+
+

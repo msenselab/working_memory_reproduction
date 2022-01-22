@@ -1,5 +1,6 @@
 ###########################################################################
-# Totally the same with pymc model
+# Hierarchical Bayesian modeling (logarithmic encoding version)
+# for manuscript: Duration reproduction under memory pressure: Modeling the roles of visual memory load in duration encoding and reproduction
 ############################################################################
 library(parallel)
 library(doParallel)

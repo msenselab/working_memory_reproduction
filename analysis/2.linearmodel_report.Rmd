@@ -84,7 +84,6 @@ AllExpData$Exp = paste0('Exp', AllExpData$Exp)
 
 ```{r}
 #plot WM correct rates
-
 AllExpData$WMCrr <- AllExpData$TPresent == AllExpData$WMRP
 wmPlotData <- dplyr::group_by(AllExpData, Exp, WMSize, NSub) %>% 
   dplyr::summarize(m_WMCrr = mean(WMCrr), n = n(), se_WMCrr = sd(WMCrr)/sqrt(n-1))
@@ -117,57 +116,7 @@ m_wmp<- dplyr::group_by(dat, Exp, WMSize, NSub) %>%
 
 ```
 
-# run models to compute parameters  {-}
-```{r include=FALSE}
-# function to run models on  lrz cluster parallely
-runModelparallely<- function(AllExpData){
-  expList <- unique(AllExpData$Exp)
-  subList <- unique(AllExpData$NSub)
-  for (expName in expList) {
-    sub_exp_dat <- list()
-    data_exp <- AllExpData %>% dplyr::filter(Exp == expName)
-    data_exp$model <- expName
-    sub_exp <-  split(data_exp, data_exp$NSub) # split data for each subject
-    for (subNo in subList) {
-      sub_exp_dat <- list.append(sub_exp_dat, sub_exp[[subNo]])
-    }
-    rlt <- runModelcluster(sub_exp_dat)
-    saveRDS(rlt, file = paste0(getwd(), "/analysis/", modelPath, "/rlt/rlt_", expName,".rds"))
-  }
-}
-```
 
-```{r include=FALSE}
-# function to run models on local computer
-runModelonlocal<- function(AllExpData){
-  expList <- unique(AllExpData$Exp)
-  subList <- unique(AllExpData$NSub)
-  for (expName in expList) {
-    rlt <-list()
-    data_exp <- AllExpData %>% dplyr::filter(Exp == expName)
-    data_exp$model <- expName
-    sub_exp <-  split(data_exp, data_exp$NSub) # split data for each subject
-    for (subNo in subList) {
-      rlt <- list.append(rlt, funFitStan(sub_exp[[subNo]]))
-    }
-    saveRDS(rlt, file = paste0(getwd(), "/analysis/", modelPath, "/rlt/rlt_", expName,".rds"))
-  }
-}
-```
-
-```{r include=FALSE}
-if(runModelparallel == TRUE){
-  #execute the model running parallelly
-  runModelparallely(AllExpData)
-}
-```
-
-```{r include=FALSE}
-#execute the model running locally
-if (runModellocally == TRUE){
-  runModelonlocal(AllExpData)
-}
-```
 
 # Merge the Result data
 ```{r include=FALSE}
@@ -213,14 +162,13 @@ funMergeMRlt <- function(explist, path, version){
 ```{r include=FALSE}
 needmerge = 1
 models_to_merge <- c('Exp1','Exp2','Exp3','Exp4') 
-
-
 if (needmerge == 1){
   funMergeMRlt(models_to_merge, modelPath, modelversion)
 }
 ```
 
-#behavior data
+# Behavior data
+
 ```{r include=FALSE}
 m_obsevY <- dplyr::group_by(AllExpData, curDur, WMSize, Exp, NSub) %>%
   dplyr::summarize(m_repDur = mean(repDur), 
