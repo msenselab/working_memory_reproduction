@@ -77,7 +77,7 @@ readCSV <- function(fn){
 dat <- map_df(1:4, readCSV)
 dur <- sort(unique(dat$curDur))
 AllExpData <- dat %>% filter(valid == 1)
-AllExpData$Exp = paste0('Exp', AllExpData$Exp)
+AllExpData$Exp = paste0('Exp. ', AllExpData$Exp)
 ```
 
 # Corrct rate
@@ -101,7 +101,7 @@ WMCrr2 <- ggplot(meanForPlot, aes(WMSize, mean_WMCrr, ymin = mean_WMCrr - se_WMC
   geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
   coord_cartesian(ylim = c(0.5, 1)) +
   colorSet4+
-  labs(x = "Memory load", y = "Mean correct rates of WM task") +
+  labs(x = "Memory load", y = "Mean correct rates") +
   theme_new 
 WMCrr2
 ```

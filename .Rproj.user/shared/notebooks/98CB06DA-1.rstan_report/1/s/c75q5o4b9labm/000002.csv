@@ -8,7 +8,7 @@
 "0","dat <- map_df(1:4, readCSV)"
 "0","dur <- sort(unique(dat$curDur))"
 "0","AllExpData <- dat %>% filter(valid == 1)"
-"0","AllExpData$Exp = paste0('Exp', AllExpData$Exp)"
+"0","AllExpData$Exp = paste0('Exp. ', AllExpData$Exp)"
 "0",""
 "0","#plot WM correct rates"
 "0",""

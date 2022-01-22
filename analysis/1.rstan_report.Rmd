@@ -88,7 +88,7 @@ readCSV <- function(fn){
 dat <- map_df(1:4, readCSV)
 dur <- sort(unique(dat$curDur))
 AllExpData <- dat %>% filter(valid == 1)
-AllExpData$Exp = paste0('Exp', AllExpData$Exp)
+AllExpData$Exp = paste0('Exp. ', AllExpData$Exp)
 
 #plot WM correct rates
 
@@ -109,7 +109,7 @@ WMCrr2 <- ggplot(meanForPlot, aes(WMSize, mean_WMCrr, ymin = mean_WMCrr - se_WMC
   geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
   coord_cartesian(ylim = c(0.5, 1)) +
   colorSet4+
-  labs(x = "Memory load", y = "Mean accuracy in WM task") +
+  labs(x = "Memory load", y = "Mean accuracy") +
   theme_new 
 WMCrr2
 ggsave(paste0(getwd(), "/figures/WMCrr2.png"), WMCrr2, width = 5, height = 4)

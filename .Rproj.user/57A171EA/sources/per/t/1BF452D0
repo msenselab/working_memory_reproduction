@@ -1,0 +1,26 @@
+{
+    "id": "1BF452D0",
+    "path": "~/mlabRepository/working_memory_reproduction/analysis/rstan_linear.R",
+    "project_path": "analysis/rstan_linear.R",
+    "type": "r_source",
+    "hash": "1973050880",
+    "contents": "",
+    "dirty": false,
+    "created": 1642880747036.0,
+    "source_on_save": false,
+    "relative_order": 3,
+    "properties": {
+        "source_window_id": "",
+        "Source": "Source",
+        "cursorPosition": "0,0",
+        "scrollLine": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 1642880751,
+    "encoding": "UTF-8",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1642880751478,
+    "read_only": false,
+    "read_only_alternatives": []
+}
