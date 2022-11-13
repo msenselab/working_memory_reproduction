@@ -1,0 +1,7 @@
+"0","#load test results"
+"0","AllDat_newY <- read.csv(paste0(modelPath, ""/rlt/AllDat_newY_"",modelversion,"".csv""))"
+"0","AllDat_newY$WMSize <- as.factor(AllDat_newY$WMSize)"
+"0","levels(AllDat_newY$WMSize) = c(""low"", ""medium"",  ""high"")"
+"0","AllDat_newY[which(AllDat_newY$Exp == ""Exp4""), ""Exp""] = ""Exp4a"""
+"0","AllDat_newY[which(AllDat_newY$Exp == ""Exp5""), ""Exp""] = ""Exp4b"""
+"0","AllDat_newY$Exp = as.factor(AllDat_newY$Exp)"

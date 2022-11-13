@@ -1,0 +1,15 @@
+"0","#plot WM correct rates"
+"0","dplyr::group_by(AllExpData%>%filter(Exp %in% c('Exp4a', 'Exp4b')), Exp, WMSize, NSub, gap) %>% "
+"0","  dplyr::summarize(m_WMCrr = mean(WMCrr), n = n(), se_WMCrr = sd(WMCrr)/sqrt(n-1)) -> correctrate_gap"
+"1","`summarise()` has grouped output by 'Exp', 'WMSize', 'NSub'. You can override using the `.groups` argument.
+"
+"0","write.csv(correctrate_gap, paste0(modelPath, '/rlt/correctrate_gap.csv'))"
+"0",""
+"0",""
+"0",""
+"0","correctrate_gap%>%"
+"0","  dplyr::group_by(Exp, WMSize, gap)%>%"
+"0","  dplyr::summarize( n = n(),"
+"0","             mean_WMCrr = mean(m_WMCrr), se_WMCrr = sd(m_WMCrr)/sqrt(n-1) ) -> meanForPlot_gap"
+"1","`summarise()` has grouped output by 'Exp', 'WMSize'. You can override using the `.groups` argument.
+"

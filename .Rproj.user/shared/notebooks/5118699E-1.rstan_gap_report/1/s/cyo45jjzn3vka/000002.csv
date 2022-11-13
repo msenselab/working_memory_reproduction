@@ -1,0 +1,6 @@
+"0","### generate WM correct rates"
+"0","AllExpData$WMCrr <- AllExpData$TPresent == AllExpData$WMRP"
+"0","m_wmp<- dplyr::group_by(AllExpData, Exp, WMSize, NSub) %>% "
+"0","  dplyr::summarize(m_WMCrr = mean(WMCrr), n =n(), se_WMCrr = sd(WMCrr)/sqrt(n-1))"
+"1","`summarise()` has grouped output by 'Exp', 'WMSize'. You can override using the `.groups` argument.
+"

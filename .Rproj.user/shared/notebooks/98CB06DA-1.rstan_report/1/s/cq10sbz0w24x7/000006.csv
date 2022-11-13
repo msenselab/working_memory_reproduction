@@ -1,2 +1,14 @@
-"1","
+"0","ezANOVA(data = Bayparlist, dv= ks, wid=NSub, between = .(Exp))"
+"2","Warning:"
+"2"," Converting ""NSub"" to factor for ANOVA.
+"
+"2","Warning:"
+"2"," Converting ""Exp"" to factor for ANOVA.
+"
+"2","Warning:"
+"2"," The column supplied as the wid variable contains non-unique values across levels of the supplied between-Ss variables. Automatically fixing this by generating unique wid labels.
+"
+"2","Coefficient covariances computed by hccm()
+"
+"1","$ANOVA
 "

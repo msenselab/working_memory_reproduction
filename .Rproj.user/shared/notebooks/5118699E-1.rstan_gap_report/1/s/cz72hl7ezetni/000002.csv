@@ -1,0 +1,17 @@
+"0","InP_obs<-  ggplot(data = obs_Inp_list_no_gap %>%dplyr::group_by(WMSize, Exp) %>%dplyr::summarise(m_inP = mean(inP), se_inP = sd(inP)/sqrt(n()-1)), aes(x= Exp, y=m_inP, color = WMSize))+"
+"0","  geom_line(stat = ""identity"",position = position_dodge(width = 0.2))+"
+"0","  geom_point(stat = ""identity"",position = position_dodge(width = 0.2))+ "
+"0","  geom_errorbar(width=.2,  aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP), position = position_dodge(width = 0.2)) +theme_new+"
+"0","  labs(colour = ""Memory Load"")+colorSet3+"
+"0","  xlab(' ')+ylab(""observed indifference point (s)"")+guides(shape=""none"")+"
+"0","  theme(legend.position = ""top"")"
+"1","`summarise()` has grouped output by 'WMSize'. You can override using the `.groups` argument.
+"
+"0","ggsave(paste0(getwd(), ""/"", modelPath, ""/figures/InP_obs.png""), InP_obs, width = 3, height = 3)"
+"2","geom_path: Each group consists of only one observation. Do you
+need to adjust the group aesthetic?
+"
+"0","InP_obs"
+"2","geom_path: Each group consists of only one observation. Do you
+need to adjust the group aesthetic?
+"

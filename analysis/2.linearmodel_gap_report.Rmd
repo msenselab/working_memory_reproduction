@@ -1,0 +1,766 @@
+---
+title: "Results of Logarithmic encoding model"
+author: "Fiona Zhu"
+date: "15/7/2020"
+output:
+  html_document:
+    df_print: paged
+    number_sections: true
+  pdf_document: 
+    number_sections: true
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r include=FALSE}
+# Load the packages and include functions
+source('gap_rstan_linear.R') # final 
+library(rlist)
+library(ez)
+library(tidyverse)
+library(latex2exp)
+library(lsr)
+library(rticles)
+library(DescTools)
+library(heplots)
+library(lme4)
+library(rstatix)
+library(boot)
+library(ggpubr)
+library(reshape2)
+sizeInModel <- c(1, 2, 3)
+source('mytheme.R')
+```
+
+
+
+
+```{r include=FALSE}
+options(mc.cores = parallel::detectCores()-1)
+rstan_options (auto_write=TRUE)
+rstanmodelPath = 'modelrlt'
+modelPath = paste0(rstanmodelPath, '/models/', modelversion)
+library(ggpubr)
+```
+
+
+
+```{r include=FALSE}
+# ## read data
+# dat = data.frame()
+# readCSV <- function(fn){
+#   filename = paste0("../data/","Exp",toString(fn),".csv")
+#   read.csv(filename) %>% mutate(Exp = fn)
+# }
+# 
+# dat <- map_df(1:4, readCSV)
+# dur <- sort(unique(dat$curDur))
+# AllExpData <- dat %>% filter(valid == 1)
+# AllExpData$Exp = paste0('Exp', AllExpData$Exp)
+AllExpData = read.csv("../data/AllValidData.csv")
+dur <- sort(unique(AllExpData$curDur))
+AllExpData[which(AllExpData$Exp == 'Exp4'),"Exp"] = "Exp4a"
+AllExpData[which(AllExpData$Exp == 'Exp5'),"Exp"] = "Exp4b"
+```
+
+
+# run models to compute parameters  {-}
+
+```{r include=FALSE}
+# function to run models on  lrz cluster parallely
+runModelparallely<- function(AllExpData){
+  expList <- unique(AllExpData$Exp)
+  subList <- unique(AllExpData$NSub)
+  for (expName in expList) {
+    sub_exp_dat <- list()
+    data_exp <- AllExpData %>% dplyr::filter(Exp == expName)
+    data_exp$model <- expName
+    sub_exp <-  split(data_exp, data_exp$NSub) # split data for each subject
+    for (subNo in subList) {
+      sub_exp_dat <- list.append(sub_exp_dat, sub_exp[[subNo]])
+    }
+    rlt <- runModelcluster(sub_exp_dat)
+    saveRDS(rlt, file = paste0(getwd(), "/analysis/", modelPath, "/rlt/rlt_", expName,".rds"))
+  }
+}
+```
+
+```{r include=FALSE}
+# function to run models on local computer
+runModelonlocal<- function(AllExpData){
+  expList <- unique(AllExpData$Exp)
+  subList <- unique(AllExpData$NSub)
+  for (expName in expList) {
+    rlt <-list()
+    data_exp <- AllExpData %>% dplyr::filter(Exp == expName)
+    data_exp$model <- expName
+    sub_exp <-  split(data_exp, data_exp$NSub) # split data for each subject
+    for (subNo in subList) {
+      rlt <- list.append(rlt, funFitStan(sub_exp[[subNo]]))
+    }
+    saveRDS(rlt, file = paste0(getwd(), "/analysis/", modelPath, "/rlt/rlt_", expName,".rds"))
+  }
+}
+```
+
+
+# Merge the Result data
+```{r include=FALSE}
+#To preprocess the model result data, and merge different model version data together.
+#function to merge the model result data
+
+funMergeMRlt <- function(explist, path, version){
+  rltfilename <- {}
+  rltfilename <- c(rltfilename, paste0("rlt_", explist, ".rds"))
+  AllDat_Bayparlist <- {}
+  AllDat_predY <- {}
+  AllDat_newY <- {}
+  modelResultAll <- list()
+  merge.data.all <- {}
+  merge.data <- readRDS(file.path(paste0( getwd(), "/", path, "/rlt/", rltfilename[1])))
+  for (i in 1:length(merge.data)){
+    modelResultAll <- list.append(modelResultAll, merge.data[[i]])
+    AllDat_Bayparlist <- rbind(AllDat_Bayparlist, merge.data[[i]]$Baypar)
+    AllDat_predY <- rbind(AllDat_predY, merge.data[[i]]$PredY_list)
+    AllDat_newY<- rbind(AllDat_newY, merge.data[[i]]$NewY_list)
+  }
+  
+  if (length(rltfilename) >= 2) {
+    for (i in 2:length(rltfilename)){
+      new.data = readRDS(file.path(paste0(getwd(), "/", path, "/rlt/", rltfilename[i])))
+      for (j in 1:length(new.data)){
+        modelResultAll <- list.append(modelResultAll, new.data[[j]])
+        AllDat_Bayparlist <- rbind(AllDat_Bayparlist, new.data[[j]]$Baypar)
+        AllDat_predY <- rbind(AllDat_predY, new.data[[j]]$PredY_list)
+        AllDat_newY<- rbind(AllDat_newY, new.data[[j]]$NewY_list)
+      }
+    }
+  }
+  write.csv(AllDat_Bayparlist, paste0(getwd(), "/", path, "/rlt/AllDat_Bayparlist_", modelversion, ".csv"))
+  write.csv(AllDat_predY, paste0( getwd(), "/",path, "/rlt/AllDat_predY_", modelversion, ".csv"))
+  write.csv(AllDat_newY, paste0(getwd(), "/",path, "/rlt/AllDat_newY_", modelversion, ".csv"))
+  saveRDS(modelResultAll, file = paste0(getwd(), "/", path, "/rlt/modelResultAll_", modelversion, ".rds")) 
+}
+
+```
+
+
+
+```{r include=FALSE}
+needmerge = 1
+models_to_merge <- c('Exp1','Exp2','Exp3','Exp4','Exp5') 
+
+if (needmerge == 1){
+  funMergeMRlt(models_to_merge, modelPath, modelversion)
+}
+```
+
+
+```{r include=FALSE}
+m_obsevY <- dplyr::group_by(AllExpData, curDur, WMSize, Exp, NSub) %>%
+  dplyr::summarize(m_repDur = mean(repDur), 
+            sd_repDur = sd(repDur))
+m_obsevY$bias_repDur <- m_obsevY$m_repDur - m_obsevY$curDur
+m_obsevY$RP_CV <- m_obsevY$sd_repDur/m_obsevY$m_repDur
+#change the table struction of correct rates
+obsevY_list <-split(m_obsevY, m_obsevY$WMSize) 
+obsevRP_list = NULL
+for (i in 1: length(obsevY_list)){
+  temp = obsevY_list[[i]]
+  wmsize = unique(temp$WMSize)
+  temp$WMSize = NULL
+  colnames(temp) = c('curDur', 'Exp',  'NSub', paste0('m_repDur_',wmsize), paste0('sd_repDur_',wmsize), paste0('bias_repDur_',wmsize), paste0('RP_CV_',wmsize))
+  if(i == 1)
+    obsevRP_list = temp
+  else
+    obsevRP_list = left_join(obsevRP_list, temp, by=c("curDur","Exp",  "NSub"))
+}
+
+write.csv(obsevRP_list,paste0(modelPath, '/rlt/ObsevRP.csv'))
+```
+
+
+```{r include=FALSE}
+### load model result data
+AllDat_Bayparlist <- read_csv(paste0(modelPath, "/rlt/AllDat_Bayparlist_",modelversion,".csv"))
+AllDat_predY <- read_csv(paste0(modelPath, "/rlt/AllDat_predY_",modelversion,".csv"))
+AllDat_newY <- read_csv(paste0(modelPath, "/rlt/AllDat_newY_",modelversion,".csv"))
+AllDat_Bayparlist[which(AllDat_Bayparlist$Exp == 'Exp4'),"Exp"] = "Exp4a"
+AllDat_Bayparlist[which(AllDat_Bayparlist$Exp == 'Exp5'),"Exp"] = "Exp4b"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp4'),"Exp"] = "Exp4a"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp5'),"Exp"] = "Exp4b"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp4'),"Exp"] = "Exp4a"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp5'),"Exp"] = "Exp4b"
+AllDat_predY$WMSize <- factor(AllDat_predY$WMSize, labels = c("low", "medium",  "high")) 
+AllDat_newY$WMSize <- factor(AllDat_newY$WMSize, labels = c("low", "medium",  "high"))
+
+```
+
+
+# WAIC and LOO-CV
+```{r}
+m_WAIC <- dplyr::group_by(AllDat_Bayparlist, Exp, model) %>%
+  dplyr::summarize(m_looic = mean(looic),
+                   m_waic = mean(waic),
+                   n = n(),
+                   se_waic = sd(waic)/sqrt(n-1),
+                   se_looic = sd(looic)/sqrt(n-1),
+                   m_p_loo = mean(p_loo),
+                   m_elpd_loo = mean(elpd_loo),
+                   m_se_looic = mean(se_looic),
+                   m_se_p_loo = mean(se_p_loo),
+                   m_p_waic = mean(p_waic),
+                   m_se_waic = mean(se_waic)) 
+m_WAIC
+```
+
+
+# Parameters for each subject
+
+```{r}
+m_Bayparlist <- dplyr::group_by(AllDat_Bayparlist, Exp) %>%
+  dplyr::summarize(n = n(),
+                   sig_s2 = mean(sig_s2),
+                   ks = mean(ks),
+                   ls = mean(ls),
+                   kr = mean(kr),
+                   sig_pr2 = mean(sig_pr2),
+                   sig_mn2 =mean(sig_mn2))
+m_Bayparlist
+```
+
+
+
+```{r}
+Bayparlist <- dplyr::group_by(AllDat_Bayparlist, NSub, Exp, model) %>%
+  dplyr::summarize(sig_s2 = mean(sig_s2), ks = mean(ks),
+                   ls = mean(ls),
+                   kr = mean(kr),
+                   mu_pr = mean(mu_pr),
+                   sig_pr2 = mean(sig_pr2),
+                   sig_mn2 =mean(sig_mn2)) 
+
+Bayparlist$ls_1 = 1- sizeInModel[2]* Bayparlist$ls
+Bayparlist$ls_3 = 1- Bayparlist$ls *sizeInModel[2]
+Bayparlist$ls_5 = 1- Bayparlist$ls *sizeInModel[3]
+
+Bayparlist$ks_1 = 1+ Bayparlist$ks *sizeInModel[1]
+Bayparlist$ks_3 = 1+ Bayparlist$ks*sizeInModel[2]
+Bayparlist$ks_5 = 1+ Bayparlist$ks*sizeInModel[3]
+
+Bayparlist$kr_1 = 1 + Bayparlist$kr*sizeInModel[1]
+Bayparlist$kr_3 = 1 + Bayparlist$kr*sizeInModel[2]
+Bayparlist$kr_5 = 1 + Bayparlist$kr*sizeInModel[3]
+
+head(Bayparlist)
+```
+
+
+# Prediction results
+
+```{r include=FALSE}
+predY <- dplyr::group_by(AllDat_predY, curDur, Exp, NSub, model, WMSize) %>%
+  dplyr::summarize(m_repDur = mean(repDur), wp =mean(wp),
+            n = n(), 
+            se_repDur = sd(repDur)/ sqrt(n-1),
+            mpredY = mean(predY), 
+            sig_wm2 = mean(sig_wm2),
+            se_predY = sd(predY)/ sqrt(n-1)
+  )
+
+predY$m_repDurErr = predY$mpredY - predY$m_repDur
+predY$m_relativeErr = predY$m_repDurErr / predY$curDur
+```
+
+
+
+
+
+
+# Average Paremeters 
+```{r}
+mm_Baypar <- dplyr::group_by(Bayparlist, Exp) %>% #WMSize
+  dplyr::summarize(sig_s2 = mean(sig_s2), sig_pr2 = mean(sig_pr2),
+                   ks= mean(ks), kr = mean(kr), 
+                   ls = mean(ls), 
+                   mu_pr =mean(mu_pr),
+                   sig_mn2 =mean(sig_mn2)) 
+mm_Baypar
+```
+
+
+# Analysis on the Rstan model parameters
+
+
+```{r include=FALSE}
+m_newY <- dplyr::group_by(AllDat_newY, Exp, curDur, WMSize) %>%
+  dplyr::summarize(m_predY = mean(predY),
+            m_sig_r =mean(sig_r),
+            m_mu_r = mean(mu_r), 
+            log_lik =mean(log_lik),
+            n = n(),
+            se_predY = sd(predY)/sqrt(n-1),
+            se_sig_r = sd(sig_r)/sqrt(n-1),
+            se_mu_r = sd(mu_r)/sqrt(n-1)
+  )
+m_newY$bias_predDur <- m_newY$m_mu_r - m_newY$curDur
+AllDat_predY$mu_r_linear <- exp(log(AllDat_predY$mu_r) -1/2*log(1+AllDat_predY$sig_r/AllDat_predY$mu_r^2)) 
+```
+
+
+
+```{r include=FALSE}
+m_predY_sub <- dplyr::group_by(AllDat_predY, curDur, WMSize, Exp, NSub) %>%
+  dplyr::summarize(m_repDur = mean(repDur), 
+            n = n(), 
+            sd_repDur = sd(repDur),
+            m_mu_r = mean(mu_r), 
+            m_sig_r = mean(sig_r),
+            m_wp = mean(wp),
+            m_sig_wm2 = mean(sig_wm2),
+            log_lik =mean(log_lik),
+            predRP_err = mean(mu_r-repDur),
+            predVar_err = mean(sig_r-sd_repDur),
+            predRP_rerr = mean(abs(mu_r-m_repDur)/m_repDur),
+            predVar_rerr = mean(abs(sig_r-sd_repDur)/sd_repDur),
+            cv = sd_repDur/m_repDur,
+            pred_cv = mean(sig_r/mu_r),
+            predcv_err = pred_cv-cv,
+            predcv_rerr = mean(abs(pred_cv-cv)/cv) )
+
+m_predY <- m_predY_sub %>%
+  dplyr::group_by(Exp, curDur, WMSize) %>% 
+  dplyr::summarize(n = n(),
+            m_m_repDur = mean(m_repDur),
+            se_m_repDur = sd(m_repDur) /sqrt(n-1),
+            m_sd_repDur = mean(sd_repDur), 
+            m_m_sig_r =mean(m_sig_r),
+            se_sig_r = sd(m_sig_r)/sqrt(n-1),
+            m_m_mu_r = mean(m_mu_r),
+            m_m_wp = mean(m_wp),
+            cv = mean(cv),
+            pred_cv = mean(pred_cv),
+            m_m_sig_wm2 = mean(m_sig_wm2),
+            log_lik =mean(log_lik),
+            mpredRP_err = mean(predRP_err),
+            mpredVar_err = mean(predVar_err),
+            mpredRP_rerr = mean(predRP_rerr),
+            mpredVar_rerr = mean(predVar_rerr), 
+            mpredcv_err = mean(predcv_err),
+            mpredcv_rerr = mean(predcv_rerr))
+m_predY$bias_repDur <- m_predY$m_m_repDur - m_predY$curDur
+```
+
+
+
+
+##  Indifference point and slope (linear regression)
+
+
+### Observed data
+
+```{r}
+#Observed Indifference Point for Exp.4b
+obs_model <- function(df) {
+  lm(repDur ~ curDur, data = df)
+}
+#Observed Indifference Point
+obs_Inp_list <- AllDat_predY %>% 
+  dplyr::group_by(NSub, Exp, WMSize) %>% nest()  %>%
+  mutate(model = map(data, obs_model)) %>%  # linear regression
+  mutate(slope = map(model, broom::tidy)) %>%  # get estimates
+  unnest(slope, .drop = TRUE) %>% # remove raw data
+  select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns
+  spread(term, estimate) %>%   # spread stimates
+  dplyr::rename(Intercept = `(Intercept)`, slope = curDur)  # rename columns
+obs_Inp_list$model = NULL
+obs_Inp_list$data = NULL
+obs_Inp_list$inP = obs_Inp_list$Intercept /(1-obs_Inp_list$slope)
+```
+
+
+
+```{r}
+obs_Inp_list <- AllDat_predY %>%
+  dplyr::group_by(NSub, Exp, WMSize) %>% nest()  %>%
+  mutate(model = map(data, obs_model)) %>%  # linear regression
+  mutate(slope = map(model, broom::tidy)) %>%  # get estimates
+  unnest(slope, .drop = TRUE) %>% # remove raw data
+  select(-std.error,-statistic, -p.value) %>%
+  spread(term, estimate) %>%   # spread stimates
+  dplyr::rename(Intercept = `(Intercept)`, slope = curDur)  # rename columns
+obs_Inp_list$model = NULL
+obs_Inp_list$data = NULL
+obs_Inp_list$inP = obs_Inp_list$Intercept /(1-obs_Inp_list$slope)
+```
+
+
+```{r}
+# plot the observed indifference points and slopes of RP
+plt_obs_InP_slope_err<- ggplot(data = obs_Inp_list %>% group_by(Exp, WMSize)%>%
+  dplyr::summarise(n=n(),
+                   m_inP = mean(inP),
+                   se_inP = sd(inP)/sqrt(n-1),
+                   m_slope = mean(slope),
+                   se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y=m_inP, color = WMSize))+
+  geom_line(stat = "identity")+
+  geom_point(stat = "identity")+ 
+  geom_errorbar(width = 0.02, aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP)) +
+  geom_errorbarh(height =0.02, aes(xmin = m_slope - se_slope, xmax = m_slope + se_slope)) +
+  theme_new+
+  labs(colour = "Memory Load")+colorSet3+
+  facet_grid(~Exp)+
+  xlab('slope of reproduction')+ylab("indifference point (s)")+guides(shape="none")+
+  theme(legend.position = "top")
+
+
+ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_obs_InP_slope_err.png"), plt_obs_InP_slope_err, width = 5, height = 5)
+
+plt_obs_InP_slope_err
+```
+
+####  anova on observed InP
+
+```{r}
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp1'), dv= inP, wid=NSub, within = .(WMSize))
+```
+
+```{r}
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp2'), dv= inP, wid=NSub, within = .(WMSize))
+```
+
+```{r}
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp3'), dv= inP, wid=NSub, within = .(WMSize))
+```
+
+```{r}
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp4a'), dv= inP, wid=NSub, within = .(WMSize))
+```
+
+
+####  anova on observed slope
+
+```{r}
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp1'), dv= slope, wid=NSub, within = .(WMSize))
+```
+
+```{r}
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp2'), dv= slope, wid=NSub, within = .(WMSize))
+```
+
+```{r}
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp3'), dv= slope, wid=NSub, within = .(WMSize))
+```
+
+```{r}
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp4a'), dv= slope, wid=NSub, within = .(WMSize))
+```
+
+
+### Predicated InP and slope
+
+```{r}
+#Predicated Indifference Point for Exp.4b
+pred_model <- function(df) {
+  lm(mu_r ~ curDur, data = df)
+}
+
+pred_Inp_list <- AllDat_predY %>% 
+  dplyr::group_by(NSub, Exp, WMSize) %>% nest()  %>%
+  mutate(model = map(data, pred_model)) %>%  # linear regression
+  mutate(slope = map(model, broom::tidy)) %>%  # get estimates
+  unnest(slope, .drop = TRUE) %>% # remove raw data
+  select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns
+  spread(term, estimate) %>%   # spread stimates
+  dplyr::rename(Intercept = `(Intercept)`, pred_slope = curDur)  # rename columns
+pred_Inp_list$model = NULL
+pred_Inp_list$data = NULL
+pred_Inp_list$pred_inP = pred_Inp_list$Intercept /(1-pred_Inp_list$pred_slope)
+```
+
+```{r}
+pred_Inp_slope <- AllDat_predY %>% 
+  dplyr::group_by(NSub, Exp, WMSize) %>% nest()  %>%
+  mutate(model = map(data, pred_model)) %>%  # linear regression
+  mutate(slope = map(model, broom::tidy)) %>%  # get estimates
+  unnest(slope, .drop = TRUE) %>% # remove raw data
+  select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns
+  spread(term, estimate) %>%   # spread stimates
+  dplyr::rename(Intercept = `(Intercept)`, pred_slope = curDur)  # rename columns
+pred_Inp_slope$model = NULL
+pred_Inp_slope$data = NULL
+pred_Inp_slope$pred_inP = pred_Inp_slope$Intercept /(1-pred_Inp_slope$pred_slope)
+```
+
+
+```{r}
+m_pred_Inp_slope = pred_Inp_slope %>% group_by(Exp, WMSize)%>%
+  dplyr::summarise(n=n(),
+                   m_Intercept = mean(Intercept),
+                   se_Intercept= sd(Intercept)/sqrt(n-1),
+                   m_pred_inP = mean(pred_inP),
+                   se_pred_inP = sd(pred_inP)/sqrt(n-1),
+                   m_pred_slope = mean(pred_slope),
+                   se_pred_slope = sd(pred_slope)/sqrt(n-1))
+```
+
+
+```{r}
+# plot the observed indifference points and slopes of RP
+plt_pred_InP_slope_err<- ggplot(data = m_pred_Inp_slope, aes(x= m_pred_slope, y=m_pred_inP, color = WMSize))+
+  geom_line(stat = "identity")+
+  geom_errorbar(width = 0.02, aes(ymin = m_pred_inP - se_pred_inP, ymax = m_pred_inP + se_pred_inP)) +
+  geom_errorbarh(height =0.02, aes(xmin = m_pred_slope - se_pred_slope, xmax = m_pred_slope + se_pred_slope)) +
+  geom_point(data = obs_Inp_list%>% group_by(Exp, WMSize)%>%
+  dplyr::summarise(n=n(),
+                   m_inP = mean(inP),
+                   se_inP = sd(inP)/sqrt(n-1),
+                   m_slope = mean(slope),
+                   se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y =m_inP, color = WMSize))+
+  theme_new+
+  labs(colour = "Memory Load")+colorSet3+
+  facet_grid(~Exp)+
+  xlab('slope of reproduction')+ylab("indifference point (s)")+guides(shape="none")+
+  theme(legend.position = "top")
+
+
+ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_pred_InP_slope_err.png"), plt_pred_InP_slope_err, width = 5, height = 5)
+
+plt_pred_InP_slope_err
+```
+
+
+```{r}
+InP_obs<-  ggplot(data = obs_Inp_list %>%dplyr::group_by(WMSize, Exp) %>%dplyr::summarise(m_inP = mean(inP), se_inP = sd(inP)/sqrt(n()-1)), aes(x= Exp, y=m_inP, color = WMSize))+
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.2,  aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP), position = position_dodge(width = 0.2)) +theme_new+
+  labs(colour = "Memory Load")+colorSet3+
+  xlab(' ')+ylab("observed indifference point (s)")+guides(shape="none")+
+  theme(legend.position = "top")
+
+ggsave(paste0(getwd(), "/", modelPath, "/figures/InP_obs.png"), InP_obs, width = 3, height = 3)
+InP_obs
+```
+
+```{r}
+InP_pred<-  ggplot(data = m_pred_Inp_slope, aes(x= Exp, y=m_pred_inP, color = WMSize))+
+  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
+  geom_errorbar(width=.2,  aes(ymin = m_pred_inP - se_pred_inP, ymax = m_pred_inP + se_pred_inP), position = position_dodge(width = 0.2)) +theme_new+
+  labs(colour = "Memory Load")+colorSet3+
+  xlab(' ')+ylab("indifference point (s)")+guides(shape="none")+
+  theme(legend.position = "top")
+
+
+ggsave(paste0(getwd(), "/", modelPath, "/figures/InP_pred.png"), InP_pred, width = 3, height = 3)
+InP_pred
+```
+
+### calculate the predication error
+
+```{r}
+Inp_list = left_join(obs_Inp_list, pred_Inp_slope, by = c("NSub", "Exp", "WMSize"))
+Inp_list$InP_err = Inp_list$pred_inP -Inp_list$inP
+Inp_list$InP_rerr = 100*Inp_list$InP_err/ Inp_list$inP
+
+
+Inp_list$slope_err = Inp_list$pred_slope - Inp_list$slope
+Inp_list$slope_rerr = 100* Inp_list$slope_err/Inp_list$slope
+
+m_Inp_list = Inp_list %>% dplyr::group_by(Exp) %>% dplyr::summarise(m_InP_rerr = mean(InP_rerr), m_slope_rerr = mean(slope_rerr), m_InP_rerr_abs = mean(abs(InP_rerr)), m_slope_rerr_abs = mean(abs(slope_rerr)))
+
+m_Inp_list$InP_auc = 100- m_Inp_list$m_InP_rerr_abs
+m_Inp_list$slope_auc = 100-  m_Inp_list$m_slope_rerr_abs
+
+m_Inp_list
+```
+
+
+
+```{r}
+#### replot Figure 3 in the MS
+RP  <- ggplot(data = m_predY, aes(x = curDur, y = m_m_repDur,  color=WMSize, shape = as.factor('Observation')),alpha = 0.5) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data= m_newY, aes(x=curDur, y=m_mu_r, color=WMSize)) +
+  #geom_line(data= m_newY, aes(x=curDur, y=m_predY, color=WMSize)) +
+  #geom_point(data = m_predY, aes(x = curDur, y = m_m_mu_r, color=WMSize, group = WMSize, shape = as.factor('Prediction')))+
+  geom_abline(slope=1, intercept=0)+
+  facet_grid(cols = vars(Exp)) +
+  labs(x="", y="Reproduction (s)", shape=" ", color = "Memory Load")+
+  theme_new+colorSet3
+
+ggsave(paste0(getwd(), "/", modelPath, "/figures/RP.png"), RP, width = 10, height = 6)
+
+RP
+```
+
+```{r}
+curDurItem <- unique(m_predY$curDur)
+RP_CV <- ggplot(data= m_predY, aes(x=curDur, y= m_sd_repDur/m_m_repDur, color=WMSize, shape = as.factor('Observation'))) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data = m_newY, aes(x=curDur, y=m_sig_r/m_predY, color=WMSize)) +
+  #geom_point(data= m_newY %>% filter(curDur %in% curDurItem), aes(x=curDur, y=m_sig_r/m_predY, color=WMSize,  shape = as.factor('Prediction')),alpha = 0.5) +
+  facet_grid(~Exp) +
+  labs(x="Sample intervals (s)", y=" CV (s)", shape=" ", color = "Memory Load")+ theme_new+
+  theme(strip.background = element_blank(),
+        strip.text.x = element_blank())+
+  colorSet3
+RP_CV
+ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_CV.png"), RP_CV, width = 10, height = 6)
+```
+```{r}
+fig3<-ggarrange(RP, RP_CV, common.legend = TRUE, ncol=1, nrow=2,  labels = c("a", "b"))
+ggsave(paste0(getwd(), "/", modelPath, "/figures/fig3.png"), fig3, width = 6, height = 5)
+fig3
+```
+
+
+```{r}
+# calculate the slope of the cv curve
+cvSlope_model <- function(df) {
+  lm(log(cv) ~ curDur_log, data = df)
+}
+
+mpredY <- dplyr::group_by(AllDat_predY, curDur, WMSize, Exp, NSub) %>%
+  dplyr::summarize(m_repDur = mean(repDur), 
+            n = n(), 
+            sd_repDur = sd(repDur),
+            mpredY = mean(predY), 
+            sd_predY = sd(predY),
+            m_mu_r = mean(mu_r), 
+            m_sig_r = mean(sig_r),
+            m_wp = mean(wp),
+            m_sig_wm2 = mean(sig_wm2),
+            log_lik =mean(log_lik))
+mpredY$cv <- mpredY$sd_repDur/mpredY$m_repDur
+
+```
+
+
+```{r}
+colnames  = c("sig_s2","ks", "ls","kr", "mu_pr", "sig_pr2", "sig_mn2", "waic", "wbic")
+Bayparlist_subset = Bayparlist[,!names(Bayparlist) %in% colnames]
+
+melt_columns <- c("ls", "ks", "kr")
+Bayparlist_melt <- Bayparlist_subset %>%
+  unite(newcol1, ls_1, ks_1, kr_1)%>%
+  unite(newcol3, ls_3, ks_3, kr_3)%>%
+  unite(newcol5, ls_5, ks_5, kr_5)%>%
+  melt(id.vars = c("NSub", "Exp", "model")) %>%
+  dplyr::rename(
+    wmsize = variable,
+    newcol = value
+  )%>%
+  separate(newcol, melt_columns, sep = "_")
+
+Bayparlist_melt$wmsize = substring(Bayparlist_melt$wmsize, 7,7)
+Bayparlist_melt$wmsize = as.factor(Bayparlist_melt$wmsize)
+
+for (mycolumn in melt_columns) {
+  Bayparlist_melt[,mycolumn] = as.numeric(Bayparlist_melt[,mycolumn])
+}
+
+
+mm_Baypar_melt <- Bayparlist_melt %>% 
+  dplyr::group_by(Exp, wmsize) %>%
+  dplyr::summarise(m_ls = mean(ls),   ###here ls is multified with working load size
+                   n = n(), 
+                   se_ls = sd(ls)/ sqrt(n-1),
+                   m_ks = mean(ks), 
+                   se_ks = sd(ks)/ sqrt(n-1),
+                   m_kr = mean(kr), 
+                   se_kr = sd(kr)/ sqrt(n-1))
+
+```
+
+
+
+```{r include=FALSE}
+### save the model results
+write.csv(Bayparlist,paste0(modelPath, '/rlt/Sub_Baypar.csv'))
+write.csv(mm_Baypar,paste0(modelPath, '/rlt/mBaypar.csv'))
+write.csv(mm_Baypar_melt,paste0(modelPath, '/rlt/mm_Baypar_se.csv'))
+```
+
+
+## weight of prior
+
+```{r}
+mm_Baypar_melt$wmsize = as.factor(mm_Baypar_melt$wmsize)
+mm_Baypar_melt$Exp = as.factor(mm_Baypar_melt$Exp)
+levels(mm_Baypar_melt$wmsize) <- c("Low", "Medium", "High")
+
+```
+
+
+
+
+#  Model prediction error
+
+```{r}
+m_predErr_sub<- m_predY_sub%>% 
+  dplyr::group_by(Exp, WMSize, NSub) %>% dplyr::summarise(
+    mpredRP_err=mean(predRP_err),
+    mpredVar_err=mean(predVar_err),
+    mpredRP_rerr = mean(predRP_rerr),
+    mpredVar_rerr = mean(predVar_rerr),
+    mpredcv_rerr = mean(predcv_rerr),
+    mpredcv_err = mean(predcv_err))
+
+m_predErr<- m_predY%>% 
+  dplyr::group_by(Exp, WMSize) %>% dplyr::summarise(
+    mmpredRP_err=mean(mpredRP_err),
+    mmpredVar_err=mean(mpredVar_err),
+    mmpredRP_rerr = mean(mpredRP_rerr),
+    mmpredVar_rerr = mean(mpredVar_rerr),
+    mmpredcv_rerr = mean(mpredcv_rerr),
+    mmpredcv_err = mean(mpredcv_err))
+m_predErr_sub$model = 'linear'
+m_predErr$model = 'linear'
+write.csv(m_predErr_sub, paste0(getwd(), "/", modelPath, "/rlt/m_predErr_sub_", modelversion, ".csv"))
+write.csv(m_predErr, paste0(getwd(), "/", modelPath, "/rlt/m_predErr_", modelversion, ".csv"))
+```
+
+
+```{r}
+ggplot(m_predErr_sub, aes(mpredRP_rerr*100, mpredcv_rerr*100, color = WMSize, alpha = .9)) + 
+  #geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_rerr*100, mmpredcv_rerr*100, color = WMSize, alpha = .9, size = 1 ))+
+  xlab('Relative prediction error in the RP means (%)')+ ylab('Relative prediction error of CV (%)')+colorSet3+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+```
+
+
+
+```{r}
+plt_rErrorScatter = ggplot(m_predErr_sub, aes(mpredRP_rerr*100, mpredVar_rerr*100, color = WMSize, alpha = .9)) + 
+  #geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_rerr*100, mmpredVar_rerr*100, color = WMSize, alpha = .9, size = 1 ))+
+  xlab('Relative prediction error in the RP means (%)')+ ylab('Relative prediction error in the RP variance (%)')+colorSet3+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+
+plt_rErrorScatter
+```
+
+
+```{r}
+plt_ErrorScatter = ggplot(m_predErr_sub, aes(mpredRP_err, mpredVar_err, color = WMSize, alpha = .9)) + 
+  geom_hline(yintercept = 0, linetype='dashed')+ geom_vline(xintercept = 0, linetype='dashed')+ 
+  geom_point() +
+  geom_point(data = m_predErr, aes(mmpredRP_err, mmpredVar_err, color = WMSize, alpha = .9, size = 1 ))+
+  xlab('Prediction error in the RP means (ms)')+ ylab('Prediction error in the RP variance (ms)')+colorSet3+
+  facet_wrap(~Exp)+
+  theme_new+ theme(legend.position = 'top')+guides(size="none")+guides(alpha="none")
+
+plt_ErrorScatter
+```
+
+

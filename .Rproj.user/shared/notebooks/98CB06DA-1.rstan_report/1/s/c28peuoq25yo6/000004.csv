@@ -1,2 +1,20 @@
-"1","
+"0","mpredY_sub$RP_Bias = mpredY_sub$m_repDur-mpredY_sub$curDur"
+"0","RP_bias_Anova <- ezANOVA(data = mpredY_sub, dv= RP_Bias, wid=NSub, within= .(curDur, WMSize), between = .(Exp), detailed = TRUE, return_aov = FALSE )"
+"2","Warning:"
+"2"," Converting ""NSub"" to factor for ANOVA.
+"
+"2","Warning:"
+"2"," ""curDur"" will be treated as numeric.
+"
+"2","Warning:"
+"2"," Converting ""Exp"" to factor for ANOVA.
+"
+"2","Warning:"
+"2"," The column supplied as the wid variable contains non-unique values across levels of the supplied between-Ss variables. Automatically fixing this by generating unique wid labels.
+"
+"2","Warning:"
+"2"," There is at least one numeric within variable, therefore aov() will be used for computation and no assumption checks will be obtained.
+"
+"0","RP_bias_Anova"
+"1","$ANOVA
 "

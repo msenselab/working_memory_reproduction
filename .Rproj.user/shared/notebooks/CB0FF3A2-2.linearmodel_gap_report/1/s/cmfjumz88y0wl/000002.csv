@@ -1,0 +1,13 @@
+"0","needmerge = 1"
+"0","models_to_merge <- c('Exp1','Exp2','Exp3','Exp4','Exp5') "
+"0",""
+"0","if (needmerge == 1){"
+"0","  funMergeMRlt(models_to_merge, modelPath, modelversion)"
+"0","}"
+"2","Warning in gzfile(file, ""rb"") :"
+"2","
+ "
+"2"," cannot open compressed file '/Users/fionazhu/mlabRepository/working_memory_reproduction/analysis/modelrlt/models/linear_rstan/rlt/rlt_Exp1.rds', probable reason 'No such file or directory'
+"
+"2","Error in gzfile(file, ""rb"") : cannot open the connection
+"

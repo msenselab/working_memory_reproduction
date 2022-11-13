@@ -1,0 +1,8 @@
+"0","WMCrr_gap <- ggplot(meanForPlot_gap, aes(WMSize, mean_WMCrr, ymin = mean_WMCrr - se_WMCrr, ymax = mean_WMCrr + se_WMCrr, group =interaction(Exp,gap), color = gap, shape = Exp, linetype = Exp))+ "
+"0","  geom_line(stat = ""identity"",position = position_dodge(width = 0.2))+"
+"0","  geom_point(stat = ""identity"",position = position_dodge(width = 0.2))+ "
+"0","  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +"
+"0","  coord_cartesian(ylim = c(0.5, 1)) +"
+"0","  colorSet5+"
+"0","  labs(x = ""Memory load"", y = ""Mean accuracy in WM task"") +theme_new "
+"0","WMCrr_gap"

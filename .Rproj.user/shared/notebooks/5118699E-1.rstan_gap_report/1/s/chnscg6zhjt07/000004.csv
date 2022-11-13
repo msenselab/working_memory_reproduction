@@ -1,0 +1,60 @@
+"0",""
+"0","library(Rmisc)"
+"2","Loading required package: lattice
+"
+"2","
+Attaching package: ‘lattice’
+
+"
+"2","The following object is masked from ‘package:boot’:
+
+    melanoma
+
+"
+"2","Loading required package: plyr
+"
+"2","----------------------------------------------------------------
+"
+"2","You have loaded plyr after dplyr - this is likely to cause problems.
+If you need functions from both plyr and dplyr, please load plyr first, then dplyr:
+library(plyr); library(dplyr)
+"
+"2","----------------------------------------------------------------
+"
+"2","
+Attaching package: ‘plyr’
+
+"
+"2","The following object is masked from ‘package:ggpubr’:
+
+    mutate
+
+"
+"2","The following objects are masked from ‘package:rstatix’:
+
+    desc, mutate
+
+"
+"2","The following objects are masked from ‘package:dplyr’:
+
+    arrange, count, desc, failwith, id, mutate, rename,
+    summarise, summarize
+
+"
+"2","The following object is masked from ‘package:purrr’:
+
+    compact
+
+"
+"0","mCI <- cilist%>% filter(inPOutlier == FALSE) %>% dplyr::group_by(Exp, WMSize) %>%"
+"0","  dplyr::summarise(n = n(),"
+"0","                   m_RPInP_boot = mean(mRP_InP_boot),"
+"0","                   m_predInP_boot = mean(m_predInP_boot),"
+"0","                   m_sd_predInP_boot = mean(sd_predInP_boot),"
+"0","                   m_sd_RPInP_boot= mean(sd_RPInP_boot),"
+"0","                   m_RPSlope_boot = mean(mRP_slope_boot),"
+"0","                   m_predSlope_boot = mean(m_pred_slope_boot),"
+"0","                   m_sd_predSlope_boot = mean(sd_pred_slope_boot),"
+"0","                   m_sd_RPSlope_boot= mean(sd_RP_slope_boot))"
+"1","`summarise()` has grouped output by 'Exp'. You can override using the `.groups` argument.
+"

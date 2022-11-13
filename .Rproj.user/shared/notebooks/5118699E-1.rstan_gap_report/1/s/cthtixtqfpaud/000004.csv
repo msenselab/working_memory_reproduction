@@ -1,0 +1,4 @@
+"0","ggsave(paste0(getwd(), ""/"", modelPath, ""/figures/plt_wp.png""), plt_wp, width = 3, height = 3)"
+"2","geom_path: Each group consists of only one observation. Do you
+need to adjust the group aesthetic?
+"

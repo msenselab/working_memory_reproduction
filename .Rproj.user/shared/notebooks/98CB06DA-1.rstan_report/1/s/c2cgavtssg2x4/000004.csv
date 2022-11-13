@@ -1,0 +1,12 @@
+"0","plt_CVIntecept<- ggplot(mCVslopes, aes(Exp, m_obs_cv_Intercept, ymin = m_obs_cv_Intercept - se_obs_CV_Intercept, ymax = m_obs_cv_Intercept + se_obs_CV_Intercept, group =interaction(Exp, WMSize), color = factor(WMSize)), shape = factor(WMSize))+ "
+"0","  geom_line(stat = ""identity"",position = position_dodge(width = 0.2))+"
+"0","  geom_point(stat = ""identity"",position = position_dodge(width = 0.2))+ "
+"0","  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +"
+"0","  colorSet4+ "
+"0","  labs(x = """", y = TeX(""Intercept of CV""), color = 'Memory Load') +"
+"0","  theme_new +theme(legend.position=""top"")"
+"0",""
+"0","plt_CVIntecept"
+"2","geom_path: Each group consists of only one observation. Do
+you need to adjust the group aesthetic?
+"

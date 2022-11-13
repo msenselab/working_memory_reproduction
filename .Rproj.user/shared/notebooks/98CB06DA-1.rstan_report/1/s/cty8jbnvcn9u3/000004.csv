@@ -1,0 +1,12 @@
+"0","m_predErr_sub$model = 'logarithmic'"
+"0","m_predErr$model = 'logarithmic'"
+"0","linear_model_path = 'linear_rstan'"
+"0","linear_model = 'linear'"
+"0","m_predErr_linear = read.csv(paste0(getwd(), ""/"", rstanmodelPath, '/models/', linear_model_path, ""/rlt/m_predErr_"", linear_model, "".csv""))"
+"2","Warning in file(file, ""rt"") :"
+"2","
+ "
+"2"," cannot open file '/Users/fionazhu/mlabRepository/working_memory_reproduction/analysis/modelrlt/models/linear_rstan/rlt/m_predErr_linear.csv': No such file or directory
+"
+"2","Error in file(file, ""rt"") : cannot open the connection
+"

@@ -1,0 +1,13 @@
+"0","#plot InP_curve(the intersections of the Prediction curve with the diagonal)"
+"0","plt_InP<- ggplot(data = mBaypar_InP%>%filter(Type== ""InP_curve""), aes(x= Exp, y=m_InP, color = WMSize, shape = Type))+"
+"0","  geom_line(stat = ""identity"",position = position_dodge(width = 0.2))+"
+"0","  geom_point(stat = ""identity"",position = position_dodge(width = 0.2))+ "
+"0","  geom_errorbar(width=.2,  aes(ymin = m_InP - se_InP, ymax = m_InP + se_InP), position = position_dodge(width = 0.2)) +theme_new+"
+"0","  labs(colour = ""Memory Load"")+colorSet3+"
+"0","  xlab(' ')+ylab(""Indifferent point (s)"")+guides(shape=""none"")+"
+"0","  theme(legend.position = ""top"")"
+"0",""
+"0","plt_InP"
+"2","geom_path: Each group consists of only one observation. Do
+you need to adjust the group aesthetic?
+"

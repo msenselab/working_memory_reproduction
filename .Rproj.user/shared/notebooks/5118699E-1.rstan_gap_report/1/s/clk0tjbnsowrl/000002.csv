@@ -1,0 +1,6 @@
+"0","ezANOVA(data = obs_Inp_list_no_gap %>% filter(Exp =='Exp4a'), dv= inP, wid=NSub, within = .(WMSize))"
+"2","Warning:"
+"2"," Converting ""NSub"" to factor for ANOVA.
+"
+"1","$ANOVA
+"
