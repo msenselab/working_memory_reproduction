@@ -1724,6 +1724,7 @@ loads for individuals.</p>
 
 mRep$memory = (mRep$WMSize-1)/2  # memory load 0, 1, 2
 mRep$cond = mRep$Exp #avoid confusion from output Exp --&gt; Cond
+mRep$duration = mRep$curDur - 1.1 # centered to 1.1 (middle point)
 
 contr = rbind(c(1, -1, 0, 0), 
              c(0.5, 0.5, -1, 0),
@@ -1731,14 +1732,14 @@ contr = rbind(c(1, -1, 0, 0),
 cmat = ginv(contr)
 
 # Linear mixed model 
-mod1 = lmer(bias ~ cond*curDur*memory + 
-              (curDur * memory|NSub),  
+mod1 = lmer(bias ~ cond*duration*memory + 
+              (duration * memory|NSub),  
             contrasts = list(cond = cmat), 
             data = mRep %&gt;% filter(cond != &#39;Exp1&#39;), REML = FALSE)
 summary(mod1)</code></pre>
 <pre><code>## Linear mixed model fit by maximum likelihood . t-tests use Satterthwaite&#39;s
 ##   method [lmerModLmerTest]
-## Formula: bias ~ cond * curDur * memory + (curDur * memory | NSub)
+## Formula: bias ~ cond * duration * memory + (duration * memory | NSub)
 ##    Data: mRep %&gt;% filter(cond != &quot;Exp1&quot;)
 ## 
 ##      AIC      BIC   logLik deviance df.resid 
@@ -1746,46 +1747,44 @@ summary(mod1)</code></pre>
 ## 
 ## Scaled residuals: 
 ##     Min      1Q  Median      3Q     Max 
-## -3.2848 -0.5847 -0.0061  0.6133  2.6875 
+## -3.2848 -0.5847 -0.0061  0.6132  2.6876 
 ## 
 ## Random effects:
-##  Groups   Name          Variance  Std.Dev. Corr             
-##  NSub     (Intercept)   3.161e-02 0.177793                  
-##           curDur        3.033e-02 0.174161 -0.93            
-##           memory        6.279e-05 0.007924  0.83 -0.96      
-##           curDur:memory 4.028e-04 0.020071  0.09 -0.01 -0.25
-##  Residual               2.666e-03 0.051629                  
+##  Groups   Name            Variance  Std.Dev. Corr             
+##  NSub     (Intercept)     0.0048472 0.06962                   
+##           duration        0.0303358 0.17417   0.37            
+##           memory          0.0004630 0.02152   0.02 -0.36      
+##           duration:memory 0.0004028 0.02007   0.21 -0.01  0.93
+##  Residual                 0.0026655 0.05163                   
 ## Number of obs: 960, groups:  NSub, 64
 ## 
 ## Fixed effects:
-##                       Estimate Std. Error         df t value Pr(&gt;|t|)    
-## (Intercept)           0.435753   0.023399  64.251996  18.623  &lt; 2e-16 ***
-## cond1                 0.031977   0.066183  64.252070   0.483  0.63063    
-## cond2                 0.085405   0.057316  64.251986   1.490  0.14110    
-## cond3                 0.060378   0.066183  64.252031   0.912  0.36503    
-## curDur               -0.455532   0.022639  64.118514 -20.122  &lt; 2e-16 ***
-## memory                0.021660   0.005757 462.531131   3.762  0.00019 ***
-## cond1:curDur          0.006826   0.064031  64.118583   0.107  0.91543    
-## cond2:curDur         -0.087391   0.055453  64.118499  -1.576  0.11996    
-## cond3:curDur         -0.044487   0.064031  64.118546  -0.695  0.48971    
-## cond1:memory          0.042693   0.016283 462.531372   2.622  0.00903 ** 
-## cond2:memory          0.056846   0.014102 462.531091   4.031 6.49e-05 ***
-## cond3:memory         -0.019219   0.016283 462.531373  -1.180  0.23849    
-## curDur:memory        -0.026677   0.005425 115.600555  -4.917 2.93e-06 ***
-## cond1:curDur:memory  -0.066517   0.015345 115.600642  -4.335 3.13e-05 ***
-## cond2:curDur:memory  -0.036137   0.013289 115.600506  -2.719  0.00755 ** 
-## cond3:curDur:memory   0.033586   0.015345 115.600499   2.189  0.03062 *  
+##                         Estimate Std. Error         df t value Pr(&gt;|t|)    
+## (Intercept)            -0.065332   0.009093  63.997656  -7.185 8.80e-10 ***
+## cond1                   0.039485   0.025718  63.997656   1.535  0.12964    
+## cond2                  -0.010725   0.022273  63.997657  -0.482  0.63178    
+## cond3                   0.011442   0.025718  63.997657   0.445  0.65790    
+## duration               -0.455532   0.022640  64.107862 -20.121  &lt; 2e-16 ***
+## memory                 -0.007685   0.003376  64.494373  -2.276  0.02617 *  
+## cond1:duration          0.006826   0.064035  64.107860   0.107  0.91544    
+## cond2:duration         -0.087391   0.055456  64.107863  -1.576  0.11998    
+## cond3:duration         -0.044487   0.064035  64.107859  -0.695  0.48974    
+## cond1:memory           -0.030476   0.009549  64.494373  -3.191  0.00219 ** 
+## cond2:memory            0.017096   0.008270  64.494372   2.067  0.04273 *  
+## cond3:memory            0.017725   0.009549  64.494372   1.856  0.06800 .  
+## duration:memory        -0.026677   0.005425 115.795498  -4.917 2.92e-06 ***
+## cond1:duration:memory  -0.066517   0.015344 115.795497  -4.335 3.12e-05 ***
+## cond2:duration:memory  -0.036137   0.013289 115.795499  -2.719  0.00755 ** 
+## cond3:duration:memory   0.033586   0.015344 115.795499   2.189  0.03062 *  
 ## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## optimizer (nloptwrap) convergence code: 0 (OK)
-## Model failed to converge with max|grad| = 0.00449009 (tol = 0.002, component 1)</code></pre>
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 <pre class="r"><code>anova(mod1)</code></pre>
 <div data-pagedtable="false">
 <script data-pagedtable-source type="application/json">
-{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["Sum Sq"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["Mean Sq"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["NumDF"],"name":[3],"type":["int"],"align":["right"]},{"label":["DenDF"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["F value"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["Pr(>F)"],"name":[6],"type":["dbl"],"align":["right"]}],"data":[{"1":"0.01910365","2":"0.006367884","3":"3","4":"64.25203","5":"2.388932","6":"7.695108e-02","_rn_":"cond"},{"1":"1.07927786","2":"1.079277857","3":"1","4":"64.11851","5":"404.894602","6":"2.098858e-29","_rn_":"curDur"},{"1":"0.03773251","2":"0.037732506","3":"1","4":"462.53113","5":"14.155473","6":"1.899319e-04","_rn_":"memory"},{"1":"0.01694576","2":"0.005648585","3":"3","4":"64.11855","5":"2.119085","6":"1.064684e-01","_rn_":"cond:curDur"},{"1":"0.06689902","2":"0.022299673","3":"3","4":"462.53130","5":"8.365795","6":"1.996085e-05","_rn_":"cond:memory"},{"1":"0.06445311","2":"0.064453107","3":"1","4":"115.60056","5":"24.179793","6":"2.928369e-06","_rn_":"curDur:memory"},{"1":"0.07133028","2":"0.023776759","3":"3","4":"115.60057","5":"8.919929","6":"2.299340e-05","_rn_":"cond:curDur:memory"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["Sum Sq"],"name":[1],"type":["dbl"],"align":["right"]},{"label":["Mean Sq"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["NumDF"],"name":[3],"type":["int"],"align":["right"]},{"label":["DenDF"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["F value"],"name":[5],"type":["dbl"],"align":["right"]},{"label":["Pr(>F)"],"name":[6],"type":["dbl"],"align":["right"]}],"data":[{"1":"0.007012419","2":"0.002337473","3":"3","4":"63.99766","5":"0.876931","6":"4.578223e-01","_rn_":"cond"},{"1":"1.079129721","2":"1.079129721","3":"1","4":"64.10786","5":"404.848417","6":"2.118333e-29","_rn_":"duration"},{"1":"0.013809728","2":"0.013809728","3":"1","4":"64.49437","5":"5.180885","6":"2.616516e-02","_rn_":"memory"},{"1":"0.016943430","2":"0.005647810","3":"3","4":"64.10786","5":"2.118843","6":"1.065011e-01","_rn_":"cond:duration"},{"1":"0.075725733","2":"0.025241911","3":"3","4":"64.49437","5":"9.469805","6":"2.864214e-05","_rn_":"cond:memory"},{"1":"0.064455259","2":"0.064455259","3":"1","4":"115.79550","5":"24.181161","6":"2.921409e-06","_rn_":"duration:memory"},{"1":"0.071332659","2":"0.023777553","3":"3","4":"115.79550","5":"8.920433","6":"2.293792e-05","_rn_":"cond:duration:memory"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
   </script>
 </div>
-<pre class="r"><code>tab_model(mod1)</code></pre>
+<pre class="r"><code>tab_model(mod1, digits = 3)</code></pre>
 <table style="border-collapse:collapse; border:none;">
 <tr>
 <th style="border-top: double; text-align:center; font-style:normal; font-weight:bold; padding:0.2cm;  text-align:left; ">
@@ -1814,10 +1813,10 @@ p
 (Intercept)
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.44
+-0.065
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.39 – 0.48
+-0.083 – -0.047
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 <strong>&lt;0.001</strong>
@@ -1828,13 +1827,13 @@ p
 cond1
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.03
+0.039
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.10 – 0.16
+-0.011 – 0.090
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.629
+0.125
 </td>
 </tr>
 <tr>
@@ -1842,13 +1841,13 @@ cond1
 cond2
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.09
+-0.011
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.03 – 0.20
+-0.054 – 0.033
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.137
+0.630
 </td>
 </tr>
 <tr>
@@ -1856,24 +1855,24 @@ cond2
 cond3
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.06
+0.011
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.07 – 0.19
+-0.039 – 0.062
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.362
+0.656
 </td>
 </tr>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
-curDur
+duration
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.46
+-0.456
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.50 – -0.41
+-0.500 – -0.411
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 <strong>&lt;0.001</strong>
@@ -1884,24 +1883,24 @@ curDur
 memory
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.02
+-0.008
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.01 – 0.03
+-0.014 – -0.001
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-<strong>&lt;0.001</strong>
+<strong>0.023</strong>
 </td>
 </tr>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
-cond1 * curDur
+cond1 * duration
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.01
+0.007
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.12 – 0.13
+-0.119 – 0.132
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 0.915
@@ -1909,13 +1908,13 @@ cond1 * curDur
 </tr>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
-cond2 * curDur
+cond2 * duration
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.09
+-0.087
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.20 – 0.02
+-0.196 – 0.021
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 0.115
@@ -1923,13 +1922,13 @@ cond2 * curDur
 </tr>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
-cond3 * curDur
+cond3 * duration
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.04
+-0.044
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.17 – 0.08
+-0.170 – 0.081
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 0.487
@@ -1940,13 +1939,13 @@ cond3 * curDur
 cond1 * memory
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.04
+-0.030
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.01 – 0.07
+-0.049 – -0.012
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-<strong>0.009</strong>
+<strong>0.001</strong>
 </td>
 </tr>
 <tr>
@@ -1954,13 +1953,13 @@ cond1 * memory
 cond2 * memory
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.06
+0.017
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.03 – 0.08
+0.001 – 0.033
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-<strong>&lt;0.001</strong>
+<strong>0.039</strong>
 </td>
 </tr>
 <tr>
@@ -1968,24 +1967,24 @@ cond2 * memory
 cond3 * memory
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.02
+0.018
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.05 – 0.01
+-0.001 – 0.036
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.238
+0.064
 </td>
 </tr>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
-curDur * memory
+duration * memory
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.03
+-0.027
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.04 – -0.02
+-0.037 – -0.016
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 <strong>&lt;0.001</strong>
@@ -1993,13 +1992,13 @@ curDur * memory
 </tr>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
-(cond1 * curDur) * memory
+(cond1 * duration) *<br>memory
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.07
+-0.067
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.10 – -0.04
+-0.097 – -0.036
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 <strong>&lt;0.001</strong>
@@ -2007,13 +2006,13 @@ curDur * memory
 </tr>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
-(cond2 * curDur) * memory
+(cond2 * duration) *<br>memory
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.04
+-0.036
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
--0.06 – -0.01
+-0.062 – -0.010
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 <strong>0.007</strong>
@@ -2021,13 +2020,13 @@ curDur * memory
 </tr>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; ">
-(cond3 * curDur) * memory
+(cond3 * duration) *<br>memory
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.03
+0.034
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
-0.00 – 0.06
+0.003 – 0.064
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:center;  ">
 <strong>0.029</strong>
@@ -2051,11 +2050,11 @@ Random Effects
 τ<sub>00</sub> <sub>NSub</sub>
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
-0.03
+0.00
 </td>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
-τ<sub>11</sub> <sub>NSub.curDur</sub>
+τ<sub>11</sub> <sub>NSub.duration</sub>
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
 0.03
@@ -2069,7 +2068,7 @@ Random Effects
 </td>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
-τ<sub>11</sub> <sub>NSub.curDur:memory</sub>
+τ<sub>11</sub> <sub>NSub.duration:memory</sub>
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
 0.00
@@ -2079,19 +2078,19 @@ Random Effects
 ρ<sub>01</sub>
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
--0.93
+0.37
 </td>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
-0.83
+0.02
 </td>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">
 </td>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; padding-top:0.1cm; padding-bottom:0.1cm; text-align:left;" colspan="3">
-0.09
+0.21
 </td>
 <tr>
 <td style=" padding:0.2cm; text-align:left; vertical-align:top; text-align:left; padding-top:0.1cm; padding-bottom:0.1cm;">

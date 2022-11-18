@@ -90,6 +90,7 @@ In addition, we assume in each experiment, the slope and intercept of the reprod
 
 mRep$memory = (mRep$WMSize-1)/2  # memory load 0, 1, 2
 mRep$cond = mRep$Exp #avoid confusion from output Exp --> Cond
+mRep$duration = mRep$curDur - 1.1 # centered to 1.1 (middle point)
 
 contr = rbind(c(1, -1, 0, 0), 
              c(0.5, 0.5, -1, 0),
@@ -97,13 +98,13 @@ contr = rbind(c(1, -1, 0, 0),
 cmat = ginv(contr)
 
 # Linear mixed model 
-mod1 = lmer(bias ~ cond*curDur*memory + 
-              (curDur * memory|NSub),  
+mod1 = lmer(bias ~ cond*duration*memory + 
+              (duration * memory|NSub),  
             contrasts = list(cond = cmat), 
             data = mRep %>% filter(cond != 'Exp1'), REML = FALSE)
 summary(mod1)
 anova(mod1)
-tab_model(mod1)
+tab_model(mod1, digits = 3)
 ```
 
 __Interpretation of the results__
