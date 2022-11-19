@@ -1,0 +1,3 @@
+"0","# save the model results for spss/jasp"
+"0","write.csv(m_WAIC, paste0(modelPath, ""/rlt/m_WAIC.csv""))"
+"0","write.csv(mm_Baypar,paste0(modelPath, '/rlt/mBaypar.csv'))"

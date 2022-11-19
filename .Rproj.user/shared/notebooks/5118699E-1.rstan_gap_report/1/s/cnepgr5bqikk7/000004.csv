@@ -1,0 +1,11 @@
+"0","m_predY_acc =  m_predErr_sub_all%>% "
+"0","  dplyr::group_by(Exp, model) %>% "
+"0","  dplyr::summarize(mmpredRP_rerr = mean(mpredRP_rerr)*100,"
+"0","                   mmpredVar_rerr = mean(mpredVar_rerr)*100,"
+"0","                   mmpredcv_rerr = mean(mpredcv_rerr)*100,"
+"0","                   mmpredRP_acc = (1-mean(mpredRP_rerr))*100,"
+"0","                   mmpredVar_acc = (1-mean(mpredVar_rerr))*100,"
+"0","                   mmpredCV_acc = (1-mean(mpredcv_rerr))*100)"
+"1","`summarise()` has grouped output by 'Exp'. You can override using the `.groups` argument.
+"
+"0","m_predY_acc"

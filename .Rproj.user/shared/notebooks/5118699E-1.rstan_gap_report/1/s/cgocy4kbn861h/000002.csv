@@ -1,6 +1,0 @@
-"0","ezANOVA(data = pred_Inp_slope_no_gap %>% filter(Exp =='Exp4a'), dv= pred_slope, wid=NSub, within = .(WMSize))"
-"2","Warning:"
-"2"," Converting ""NSub"" to factor for ANOVA.
-"
-"1","$ANOVA
-"

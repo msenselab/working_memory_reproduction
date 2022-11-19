@@ -1,6 +1,0 @@
-"0","ezANOVA(data = cilist %>% filter(Exp =='Exp1'), dv=m_predInP_boot, wid=NSub, within = .(WMSize))"
-"2","Warning:"
-"2"," Converting ""NSub"" to factor for ANOVA.
-"
-"1","$ANOVA
-"

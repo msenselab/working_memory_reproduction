@@ -1,9 +1,0 @@
-"0","ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp4b'), dv= slope, wid=NSub, within = .(WMSize, gap))"
-"2","Warning:"
-"2"," Converting ""NSub"" to factor for ANOVA.
-"
-"2","Warning:"
-"2"," You have removed one or more levels from variable ""gap"". Refactoring for ANOVA.
-"
-"1","$ANOVA
-"

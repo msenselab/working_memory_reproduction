@@ -1,6 +1,0 @@
-"0","ezANOVA(data = RPslopes %>% filter(Exp =='Exp2'), dv= slope, wid=NSub, within = .(WMSize))"
-"2","Warning:"
-"2"," Converting ""NSub"" to factor for ANOVA.
-"
-"1","$ANOVA
-"
