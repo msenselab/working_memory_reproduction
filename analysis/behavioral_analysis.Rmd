@@ -5,6 +5,7 @@ output:
     df_print: paged
   html_notebook: default
   pdf_document: default
+  
 ---
 
 The raw data are stored in the subfolder `data`. Let's read in. 
