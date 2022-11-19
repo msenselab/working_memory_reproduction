@@ -1,7 +1,0 @@
-"0","Baypar_WMSize_melt$Exp = as.factor(Baypar_WMSize_melt$Exp)"
-"0",""
-"0","Baypar_WMSize_melt%>% dplyr::group_by(Exp, WMSize, Type)%>%"
-"0","  dplyr::summarise(n = n(),"
-"0","                   m_InP = mean(InP), se_InP= sd(InP)/sqrt(n-1))-> mBaypar_InP"
-"1","`summarise()` has grouped output by 'Exp', 'WMSize'. You can override using the `.groups` argument.
-"

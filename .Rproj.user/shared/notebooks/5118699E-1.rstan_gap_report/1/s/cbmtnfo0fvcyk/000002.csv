@@ -1,5 +1,0 @@
-"0","source('mytheme.R')"
-"0","# model version"
-"0","modelversion = 'gap_log_rstan'"
-"0","rstanmodelPath = 'modelrlt'"
-"0","modelPath = paste0(rstanmodelPath, '/models/', modelversion)"

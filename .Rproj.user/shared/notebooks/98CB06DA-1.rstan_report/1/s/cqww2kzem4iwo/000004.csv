@@ -1,7 +1,0 @@
-"0","Bayparlist$sig2_post_1 = (Bayparlist$sig_pr2_log *(Bayparlist$sig_s2 +Bayparlist$ls*1))/(Bayparlist$sig_pr2_log + Bayparlist$sig_s2 +Bayparlist$ls*1) *0.5"
-"0",""
-"0","Bayparlist$sig2_post_3 =(Bayparlist$sig_pr2_log *(Bayparlist$sig_s2 +Bayparlist$ls*3))/(Bayparlist$sig_pr2_log + Bayparlist$sig_s2 +Bayparlist$ls*3) *0.5 "
-"0",""
-"0","Bayparlist$sig2_post_5 = (Bayparlist$sig_pr2_log *(Bayparlist$sig_s2 +Bayparlist$ls*5))/(Bayparlist$sig_pr2_log + Bayparlist$sig_s2 +Bayparlist$ls*5) *0.5"
-"0",""
-"0","Bayparlist%>%filter(Exp == 'Exp2')%>%select(""NSub"", ""Exp"", ""sig2_post_1"", ""sig2_post_3"",""sig2_post_5"")"

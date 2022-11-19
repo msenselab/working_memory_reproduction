@@ -1,8 +1,0 @@
-"0","AllExpData = read.csv(paste0(""../data/AllValidData.csv""))"
-"0","dur <- sort(unique(AllExpData$curDur))"
-"0",""
-"0","AllExpData$WMSize <- factor(AllExpData$WMSize, labels = c(""low"", ""medium"",  ""high"")) "
-"0","# 1: 500ms,  2: 2500, 3 : 2000ms the mean reaction time of WM test "
-"0","AllExpData$gap <- factor(AllExpData$gap,  labels = c('short','long', 'not sure'))"
-"0","AllExpData[which(AllExpData$Exp == 'Exp4'),""Exp""] = ""Exp4a"""
-"0","AllExpData[which(AllExpData$Exp == 'Exp5'),""Exp""] = ""Exp4b"""

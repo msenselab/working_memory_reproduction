@@ -1,8 +1,0 @@
-"0","curDurItem <- unique(m_predY$curDur)"
-"0","RP_CV <- ggplot(data= m_predY, aes(x=curDur, y= cv, color=WMSize, shape = as.factor('Observation'))) +"
-"0","  geom_point(size=2, alpha = 0.5)+"
-"0","  geom_line(data = m_newY, aes(x=curDur, y= m_sig_r/m_mu_r, color=WMSize)) +"
-"0","  facet_grid(~Exp) +"
-"0","  labs(x=""Duration (s)"", y=""CV"", shape="" "", color = ""Memory Load"")+ theme_new+"
-"0","  colorSet3+guides(shape=""none"")+theme(strip.text.x = element_blank())"
-"0","RP_CV"

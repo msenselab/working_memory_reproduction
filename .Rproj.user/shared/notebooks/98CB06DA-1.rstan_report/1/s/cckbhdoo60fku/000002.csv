@@ -1,4 +1,0 @@
-"0","### load parameters from model"
-"0","Bayparlist <- read.csv(paste0(modelPath, ""/rlt/AllDat_Bayparlist_"",modelversion,"".csv""))"
-"0","Bayparlist$mu_pr = exp(Bayparlist$mu_pr_log + Bayparlist$sig_pr2_log^2*0.5)"
-"0","Bayparlist$sig_pr2 = (exp(Bayparlist$sig_pr2_log^2)-1)*exp(2*Bayparlist$mu_pr_log+Bayparlist$sig_pr2_log^2)"
