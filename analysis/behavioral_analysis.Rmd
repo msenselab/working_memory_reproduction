@@ -94,7 +94,7 @@ mRep$cond = mRep$Exp #avoid confusion from output Exp --> Cond
 mRep$duration = mRep$curDur - 1.1 # centered to 1.1 (middle point)
 
 contr = rbind(c(1, -1, 0, 0), 
-             c(0.5, 0.5, -1, 0),
+             c(1, 0, -1, 0),
              c(0, 0, 1, -1))
 cmat = ginv(contr)
 
