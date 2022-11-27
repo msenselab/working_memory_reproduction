@@ -50,20 +50,12 @@ library(ggpubr)
 
 ```{r include=FALSE}
 # ## read data
-# dat = data.frame()
-# readCSV <- function(fn){
-#   filename = paste0("../data/","Exp",toString(fn),".csv")
-#   read.csv(filename) %>% mutate(Exp = fn)
-# }
-# 
-# dat <- map_df(1:4, readCSV)
-# dur <- sort(unique(dat$curDur))
-# AllExpData <- dat %>% filter(valid == 1)
-# AllExpData$Exp = paste0('Exp', AllExpData$Exp)
 AllExpData = read.csv("../data/AllValidData.csv")
 dur <- sort(unique(AllExpData$curDur))
-AllExpData[which(AllExpData$Exp == 'Exp4'),"Exp"] = "Exp4a"
-AllExpData[which(AllExpData$Exp == 'Exp5'),"Exp"] = "Exp4b"
+# Replace first 3 chracters "Exp" with string "Exp. "
+AllExpData$Exp <- gsub("^.{0,3}", "Exp. ", AllExpData$Exp)
+AllExpData[which(AllExpData$Exp == 'Exp. 4'),"Exp"] = "Exp. 4a"
+AllExpData[which(AllExpData$Exp == 'Exp. 5'),"Exp"] = "Exp. 4b"
 ```
 
 
@@ -188,15 +180,20 @@ write.csv(obsevRP_list,paste0(modelPath, '/rlt/ObsevRP.csv'))
 AllDat_Bayparlist <- read_csv(paste0(modelPath, "/rlt/AllDat_Bayparlist_",modelversion,".csv"))
 AllDat_predY <- read_csv(paste0(modelPath, "/rlt/AllDat_predY_",modelversion,".csv"))
 AllDat_newY <- read_csv(paste0(modelPath, "/rlt/AllDat_newY_",modelversion,".csv"))
-AllDat_Bayparlist[which(AllDat_Bayparlist$Exp == 'Exp4'),"Exp"] = "Exp4a"
-AllDat_Bayparlist[which(AllDat_Bayparlist$Exp == 'Exp5'),"Exp"] = "Exp4b"
-AllDat_predY[which(AllDat_predY$Exp == 'Exp4'),"Exp"] = "Exp4a"
-AllDat_predY[which(AllDat_predY$Exp == 'Exp5'),"Exp"] = "Exp4b"
-AllDat_newY[which(AllDat_newY$Exp == 'Exp4'),"Exp"] = "Exp4a"
-AllDat_newY[which(AllDat_newY$Exp == 'Exp5'),"Exp"] = "Exp4b"
+
+# rename experiments by replacing first 3 chracters "Exp" with string "Exp. "
+AllDat_Bayparlist$Exp <- gsub("^.{0,3}", "Exp. ", AllDat_Bayparlist$Exp)
+AllDat_Bayparlist[which(AllDat_Bayparlist$Exp == 'Exp. 4'),"Exp"] = "Exp. 4a"
+AllDat_Bayparlist[which(AllDat_Bayparlist$Exp == 'Exp. 5'),"Exp"] = "Exp. 4b"
+AllDat_predY$Exp <- gsub("^.{0,3}", "Exp. ", AllDat_predY$Exp)
+AllDat_predY[which(AllDat_predY$Exp == 'Exp. 4'),"Exp"] = "Exp. 4a"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp. 5'),"Exp"] = "Exp. 4b"
+AllDat_newY$Exp <- gsub("^.{0,3}", "Exp. ", AllDat_newY$Exp)
+AllDat_newY[which(AllDat_newY$Exp == 'Exp. 4'),"Exp"] = "Exp. 4a"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp. 5'),"Exp"] = "Exp. 4b"
+
 AllDat_predY$WMSize <- factor(AllDat_predY$WMSize, labels = c("low", "medium",  "high")) 
 AllDat_newY$WMSize <- factor(AllDat_newY$WMSize, labels = c("low", "medium",  "high"))
-
 ```
 
 
@@ -425,38 +422,38 @@ plt_obs_InP_slope_err
 ####  anova on observed InP
 
 ```{r}
-ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp1'), dv= inP, wid=NSub, within = .(WMSize))
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp. 1'), dv= inP, wid=NSub, within = .(WMSize))
 ```
 
 ```{r}
-ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp2'), dv= inP, wid=NSub, within = .(WMSize))
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp. 2'), dv= inP, wid=NSub, within = .(WMSize))
 ```
 
 ```{r}
-ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp3'), dv= inP, wid=NSub, within = .(WMSize))
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp. 3'), dv= inP, wid=NSub, within = .(WMSize))
 ```
 
 ```{r}
-ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp4a'), dv= inP, wid=NSub, within = .(WMSize))
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp. 4a'), dv= inP, wid=NSub, within = .(WMSize))
 ```
 
 
 ####  anova on observed slope
 
 ```{r}
-ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp1'), dv= slope, wid=NSub, within = .(WMSize))
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp. 1'), dv= slope, wid=NSub, within = .(WMSize))
 ```
 
 ```{r}
-ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp2'), dv= slope, wid=NSub, within = .(WMSize))
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp. 2'), dv= slope, wid=NSub, within = .(WMSize))
 ```
 
 ```{r}
-ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp3'), dv= slope, wid=NSub, within = .(WMSize))
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp. 3'), dv= slope, wid=NSub, within = .(WMSize))
 ```
 
 ```{r}
-ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp4a'), dv= slope, wid=NSub, within = .(WMSize))
+ezANOVA(data = obs_Inp_list %>% filter(Exp =='Exp. 4a'), dv= slope, wid=NSub, within = .(WMSize))
 ```
 
 
@@ -641,61 +638,12 @@ mpredY$cv <- mpredY$sd_repDur/mpredY$m_repDur
 ```
 
 
-```{r}
-colnames  = c("sig_s2","ks", "ls","kr", "mu_pr", "sig_pr2", "sig_mn2", "waic", "wbic")
-Bayparlist_subset = Bayparlist[,!names(Bayparlist) %in% colnames]
-
-melt_columns <- c("ls", "ks", "kr")
-Bayparlist_melt <- Bayparlist_subset %>%
-  unite(newcol1, ls_1, ks_1, kr_1)%>%
-  unite(newcol3, ls_3, ks_3, kr_3)%>%
-  unite(newcol5, ls_5, ks_5, kr_5)%>%
-  melt(id.vars = c("NSub", "Exp", "model")) %>%
-  dplyr::rename(
-    wmsize = variable,
-    newcol = value
-  )%>%
-  separate(newcol, melt_columns, sep = "_")
-
-Bayparlist_melt$wmsize = substring(Bayparlist_melt$wmsize, 7,7)
-Bayparlist_melt$wmsize = as.factor(Bayparlist_melt$wmsize)
-
-for (mycolumn in melt_columns) {
-  Bayparlist_melt[,mycolumn] = as.numeric(Bayparlist_melt[,mycolumn])
-}
-
-
-mm_Baypar_melt <- Bayparlist_melt %>% 
-  dplyr::group_by(Exp, wmsize) %>%
-  dplyr::summarise(m_ls = mean(ls),   ###here ls is multified with working load size
-                   n = n(), 
-                   se_ls = sd(ls)/ sqrt(n-1),
-                   m_ks = mean(ks), 
-                   se_ks = sd(ks)/ sqrt(n-1),
-                   m_kr = mean(kr), 
-                   se_kr = sd(kr)/ sqrt(n-1))
-
-```
-
-
 
 ```{r include=FALSE}
 ### save the model results
 write.csv(Bayparlist,paste0(modelPath, '/rlt/Sub_Baypar.csv'))
 write.csv(mm_Baypar,paste0(modelPath, '/rlt/mBaypar.csv'))
-write.csv(mm_Baypar_melt,paste0(modelPath, '/rlt/mm_Baypar_se.csv'))
 ```
-
-
-## weight of prior
-
-```{r}
-mm_Baypar_melt$wmsize = as.factor(mm_Baypar_melt$wmsize)
-mm_Baypar_melt$Exp = as.factor(mm_Baypar_melt$Exp)
-levels(mm_Baypar_melt$wmsize) <- c("Low", "Medium", "High")
-
-```
-
 
 
 
@@ -764,3 +712,9 @@ plt_ErrorScatter
 ```
 
 
+
+```{r}
+bf_WMSize <- bfWMSize/bfMain
+
+bf_int <- bfFull/bfMain 
+```
