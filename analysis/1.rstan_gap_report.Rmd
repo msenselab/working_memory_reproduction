@@ -838,3 +838,32 @@ tab_model(mod1)
 -There was a strong interaction between memory and duration (central tendency). Increase one memory load level, the central tendency would increase 2.6% on average.
 
 -The impact of memory on central tendency significantly differ among three contrasts (comparisons). 1. Difference between Exp 2 vs. 3. 2. Exp. 4 differred from the combination of Exp. 2 and 3. (i.e., no complete cancel each other on the central tendency when memory load was imposed on both stages) 3. Adding a gap inbetween increased 3.3% central tendency.
+
+
+
+
+## BF
+
+```{r}
+library(BayesFactor)
+mpredY_sub$NSub = as.numeric(mpredY_sub$NSub)
+
+bfFull = lmBF(RP_Bias ~ WMSize + curDur + WMSize:curDur + NSub, data = mpredY_sub%>%filter(Exp =='Exp. 1'), whichRandom = "NSub")
+
+## Bayes factor of main effects only against null
+bfMain = lmBF(RP_Bias ~ WMSize + curDur + NSub, data = mpredY_sub%>%filter(Exp =='Exp. 1'), whichRandom = "NSub")
+## Compare the main-effects only model to the full model
+bfMain / bfFull
+
+
+## Bayes factor of main effects only against null
+bfWMSize = lmBF(RP_Bias ~ WMSize + NSub, data = mpredY_sub%>%filter(Exp =='Exp. 1'), whichRandom = "NSub")
+## Compare the main-effects only model to the full model
+bfWMSize / bfFull
+
+
+## Bayes factor of main effects only against null
+bfDur = lmBF(RP_Bias ~ curDur + NSub, data = mpredY_sub%>%filter(Exp =='Exp. 1'), whichRandom = "NSub")
+## Compare the main-effects only model to the full model
+bfDur / bfFull
+```
