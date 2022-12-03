@@ -44,14 +44,17 @@ funFitStan <- function(subdat, myrstanModel, alluseOneModel,  onemodelname){
   par = c(0,0,0)
   modelname = 'Exp1'
   if(!alluseOneModel){
-    if(expName == 'Exp4'| expName == 'Exp5'){
+    if(expName == 'Exp4'){
+      par = c(1,1,1)
+    } 
+    if(expName == 'Exp5'){
       par = c(1,1,1)
       Gapnew <- c(rep(500,141*3),rep(2500,141*3))
     }
     
     if(expName == 'Exp2'){
       par = c(1,1,0)
-      Gapnew <- c(rep(2500,141*3),rep(2500,141*3))
+      Gapnew <-  c(rep(2450,141), rep(2950,141), rep(3100,141), rep(2450,141), rep(2950,141), rep(3100,141))
     }
     
     if(expName == 'Exp3'){
@@ -60,12 +63,23 @@ funFitStan <- function(subdat, myrstanModel, alluseOneModel,  onemodelname){
     }
     modelname = expName
   }else{
-    if(onemodelname == 'Exp4'|onemodelname == 'Exp5'){
+    if(onemodelname == 'Exp4'){
+      par = c(1,1,1)
+    }
+    if(onemodelname == 'Exp5'){
       par =c(1,1,1)
       Gapnew <- c(rep(500,141*3),rep(2500,141*3))
     }
+    if(onemodelname == 'Exp2'){
+      par = c(1,1,0)
+      Gapnew <-  c(rep(2450,141), rep(2950,141), rep(3100,141), rep(2450,141), rep(2950,141), rep(3100,141))
+    }
     if(onemodelname == 'Exp1'){
       par =c(0,0,0)
+    }
+    if(onemodelname == 'Exp3'){
+      par = c(0,0,1)
+      Gapnew <- c(rep(2000,141*3),rep(2000,141*3))
     }
     modelname = onemodelname
   }

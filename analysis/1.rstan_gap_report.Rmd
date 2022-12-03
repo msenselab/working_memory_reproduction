@@ -84,7 +84,7 @@ funMergeMRlt(c('Exp1','Exp2','Exp3','Exp4', 'Exp5'), modelPath, modelversion)
 # load all data and model results
 
 ```{r}
-AllExpData = read.csv(paste0("../data/AllValidData.csv"))
+AllExpData = read.csv(paste0("../data/AllValidData.csv")) %>%filter(valid == 1)
 dur <- sort(unique(AllExpData$curDur))
 
 AllExpData$WMSize <- factor(AllExpData$WMSize, labels = c("low", "medium",  "high")) 
@@ -110,6 +110,11 @@ AllDat_predY$Exp <- gsub("^.{0,3}", "Exp. ", AllDat_predY$Exp)
 AllDat_predY[which(AllDat_predY$Exp == 'Exp. 4'),"Exp"] = "Exp. 4a"
 AllDat_predY[which(AllDat_predY$Exp == 'Exp. 5'),"Exp"] = "Exp. 4b"
 AllDat_predY$Exp = as.factor(AllDat_predY$Exp)
+
+AllDat_predY$gap = 1
+AllDat_predY[which(AllDat_predY$Gap == 2500),"gap"] = 2
+AllDat_predY$gap <- factor(AllDat_predY$gap, labels = c("short", "long"))
+
 ```
 
 # Corrct rate
@@ -125,21 +130,70 @@ write.csv(WMCrr, paste0(modelPath, '/rlt/WMCrr.csv'))
 
 WMCrr%>%dplyr::group_by(Exp, WMSize)%>%
   dplyr::summarize( n = n(),
-             mean_WMCrr = mean(m_WMCrr), se_WMCrr = sd(m_WMCrr)/sqrt(n-1) ) -> meanForPlot
+                    mean_WMCrr = mean(m_WMCrr), se_WMCrr = sd(m_WMCrr)/sqrt(n-1) ) -> meanForPlot
 ```
 
+
+
+
+
 ```{r}
-WMCrr2 <- ggplot(meanForPlot, aes(WMSize, mean_WMCrr, ymin = mean_WMCrr - se_WMCrr, ymax = mean_WMCrr + se_WMCrr,
-                                  group =Exp, color = Exp, fill = Exp))+ 
+dat_Exp4b = dplyr::group_by(AllExpData%>%filter(Exp =='Exp. 4b'), WMSize, NSub, gap) %>% 
+  dplyr::summarize(m_WMCrr = mean(WMCrr), n = n(), se_WMCrr = sd(WMCrr)/sqrt(n-1))%>%
+  dplyr::group_by(gap, WMSize)%>%
+  dplyr::summarize( n = n(),
+                    mean_WMCrr = mean(m_WMCrr), se_WMCrr = sd(m_WMCrr)/sqrt(n-1))
+
+
+dat_Exp4b$gap<- factor(dat_Exp4b$gap, labels = c("short", "long")) 
+
+plt_WMCrr_Exp4b = ggplot(data = dat_Exp4b, 
+                         aes(WMSize, mean_WMCrr, ymin = mean_WMCrr - se_WMCrr, ymax = mean_WMCrr + se_WMCrr,group =gap, color = gap))+ 
+  geom_line(aes(linetype = gap), stat = "identity",position = position_dodge(width = 0.3))+
+  geom_point(aes(shape = gap), stat = "identity",position = position_dodge(width = 0.3))+ 
+  geom_errorbar(width=.3,  position = position_dodge(width = 0.3)) +
+  coord_cartesian(ylim = c(0.5, 1)) +
+  scale_color_manual(values=c("#999999", "#56B4E9"))+
+  labs("Memory load", color = "Gap", shape = "Gap", linetype = "Gap", y = "Mean accuracy in WM task in Exp. 4b") +
+  theme_new 
+plt_WMCrr_Exp4b
+```
+
+
+```{r}
+model <-ezANOVA(data= AllExpData%>%filter(Exp =='Exp. 4b')%>%dplyr::group_by(NSub, WMSize, gap)%>%dplyr::summarise(m_WMCrr = mean(WMCrr)), dv = m_WMCrr, wid = NSub, within = .(WMSize, gap), type = 3, detailed = T)
+model
+```
+```{r}
+model$ANOVA[4] / (model$ANOVA[4] + model$ANOVA[5])  
+```
+
+
+```{r}
+sub_WMCrr_Exp4b = AllExpData%>%filter(Exp =='Exp. 4b')%>%dplyr::group_by(NSub, WMSize, gap)%>%dplyr::summarise(mWMCrr = mean(WMCrr))%>%pivot_wider(names_from = c("WMSize", "gap"), values_from = c(mWMCrr), names_sep="_")
+write.csv(sub_WMCrr_Exp4b,paste0(modelPath, '/rlt/sub_WMCrr_Exp4b.csv'))
+```
+
+
+```{r}
+Exp.labs.1line <- c("Exp. 1 Control", "Exp. 2 Encoding", "Exp. 3 Reproduction", "Exp. 4a Both phases", "Exp. 4b Both phases\n \ \ \ \ \ \ \ \ \ \ \ \ \ with a gap")
+
+plt_WMCrr <- ggplot(meanForPlot, aes(WMSize, mean_WMCrr, ymin = mean_WMCrr - se_WMCrr, ymax = mean_WMCrr + se_WMCrr,
+                                     group =Exp, color = Exp))+ 
   geom_line(stat = "identity",position = position_dodge(width = 0.2))+
   geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
   geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
   coord_cartesian(ylim = c(0.5, 1)) +
-  colorSet5+
   labs(x = "Memory load", y = "Mean accuracy in WM task") +
-  theme_new 
-WMCrr2
-ggsave(paste0(getwd(), "/figures/WMCrr2.png"), WMCrr2, width = 4, height = 4)
+  theme_new +scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9", "#1a9641", "#d7191c"), labels = Exp.labs.1line)+
+  scale_shape_manual(values = Exp.labs.1line) 
+
+
+
+plt_WMCrr_2<-ggarrange(plt_WMCrr, plt_WMCrr_Exp4b, common.legend = FALSE, ncol=2, nrow=1, widths = c(5.5,4), labels = c("a", "b"))
+plt_WMCrr_2
+
+ggsave(paste0(getwd(), "/figures/plt_WMCrr_2.png"), plt_WMCrr_2, width = 9.5, height = 4)
 ```
 
 
@@ -151,9 +205,10 @@ m_wmp<- dplyr::group_by(AllExpData, Exp, WMSize, NSub) %>%
   dplyr::summarize(m_WMCrr = mean(WMCrr), n =n(), se_WMCrr = sd(WMCrr)/sqrt(n-1))
 
 ```
-```{r}
-ezANOVA(data = WMCrr, dv=m_WMCrr, wid=NSub, within = .(WMSize), between = .(Exp))
-```
+
+
+
+
 
 
 ```{r include=FALSE}
@@ -224,7 +279,7 @@ mpredY_sub <- dplyr::group_by(AllDat_predY, curDur, Exp, NSub, WMSize) %>%
 
 ```{r}
 write_csv(dplyr::group_by(mpredY_sub, curDur, NSub) %>%
-  dplyr::summarize(m_cv = mean(cv))%>%spread(curDur, m_cv), paste0(modelPath, '/rlt/m_cv.csv'))
+            dplyr::summarize(m_cv = mean(cv))%>%spread(curDur, m_cv), paste0(modelPath, '/rlt/m_cv.csv'))
 
 
 mpredY_sub$RP_bias = mpredY_sub$m_repDur -mpredY_sub$curDur
@@ -308,6 +363,10 @@ AllDat_newY$Exp <- gsub("^.{0,3}", "Exp. ", AllDat_newY$Exp)
 AllDat_newY[which(AllDat_newY$Exp == 'Exp. 4'),"Exp"] = "Exp. 4a"
 AllDat_newY[which(AllDat_newY$Exp == 'Exp. 5'),"Exp"] = "Exp. 4b"
 AllDat_newY$Exp = as.factor(AllDat_newY$Exp)
+
+AllDat_newY$gap = 1
+AllDat_newY[which(AllDat_newY$Gap == 2500, AllDat_newY$Exp == "Exp. 4b"), "gap"] = 2
+AllDat_newY$gap = factor(AllDat_newY$gap, labels = c("short", "long"))
 ```
 
 ```{r include=FALSE}
@@ -321,45 +380,140 @@ m_newY <- dplyr::group_by(AllDat_newY, Exp, curDur, WMSize) %>%
 ## RP biase
 
 ```{r}
-  RP_bias  <- ggplot(data = m_predY, aes(x = curDur, y = m_m_repDur - curDur, color=as.factor(WMSize), shape = as.factor(WMSize))) +
+Exp.labs.2lines <- c("Exp. 1\n Control", "Exp. 2\n Encoding", "Exp. 3\n Reproduction", "Exp. 4a\n Both", "Exp. 4b\n Both, with a gap")
+names(Exp.labs.2lines) <- c("Exp. 1", "Exp. 2", "Exp. 3", "Exp. 4a", "Exp. 4b")
+RP_bias  <- ggplot(data = m_predY%>%filter(Exp !="Exp. 4b"), aes(x = curDur, y = m_m_repDur - curDur, color=as.factor(WMSize), shape = as.factor(WMSize))) +
   geom_point(size=2, alpha = 0.5)+
-  geom_line(data= m_newY, aes(x=curDur, y=m_mu_r-curDur, color=WMSize)) +
+  geom_line(data= m_newY%>%filter(Exp !="Exp. 4b"), aes(x=curDur, y=m_mu_r-curDur, color=WMSize)) +
   geom_hline(yintercept = 0, linetype='dashed')+
-  facet_grid(cols = vars(Exp)) +
+  facet_grid(cols = vars(Exp), labeller = labeller(Exp = Exp.labs.2lines)) +
   labs(x=" ", y="Reproduction bias (s)", shape ="Memory Load", color = "Memory Load")+theme_new+
   colorSet3+
-  theme(legend.position = "top")
+  theme(legend.position = "top")+ylim(-0.5, 0.4)
 
-ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias.png"), RP_bias, width = 6, height = 6)
+ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias.png"), RP_bias, width = 6, height = 3)
 
 RP_bias
+```
+
+
+```{r}
+
+
+RP_bias_Exp4b  <- ggplot(data = AllDat_predY %>% filter(Exp == 'Exp. 4b')%>% 
+                           dplyr::group_by(Exp, curDur, WMSize, gap) %>% 
+                           dplyr::summarize(m_mu_r = mean(mu_r), m_repDur = mean(repDur), n= n(), se_mu_r = sd(mu_r)/sqrt(n-1)), aes(x = curDur, y = m_repDur - curDur, group = interaction(gap, WMSize), color=as.factor(WMSize), shape = gap)) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data= AllDat_newY %>% filter(Exp == 'Exp. 4b') %>% 
+              dplyr::group_by(Exp, curDur, WMSize, gap) %>% 
+              dplyr::summarize(m_mu_r = mean(mu_r),  n= n(), se_mu_r = sd(mu_r)/sqrt(n-1)), aes(x=curDur, y=m_mu_r-curDur, group = interaction(WMSize, gap), linetype = gap, color=WMSize)) +
+  geom_hline(yintercept = 0, linetype='dashed')+
+  facet_grid(cols = vars(Exp), labeller = labeller(Exp = Exp.labs.2lines)) +
+  labs(x=" ", y="Reproduction bias (s)", shape ="Gap", linetype = "Gap")+theme_new+ guides(color = "none")+
+  colorSet3+
+  theme(legend.position = "top")+ylim(-0.5, 0.4)
+
+RP_bias_Exp4b
 ```
 
 
 
 
 ```{r}
-RP_bias_obs  <- ggplot(data = AllExpData %>%  
-  dplyr::group_by(Exp, curDur, WMSize, NSub) %>% 
-  dplyr::summarize(n = n(),
-                   m_repDur = mean(repDur),
-                   se_repDur = sd(repDur)/sqrt(n-1)) %>%
-  dplyr::group_by(Exp, curDur, WMSize) %>% 
-  dplyr::summarize(m_m_repDur = mean(m_repDur),
-                   m_se_repDur = mean(se_repDur)), aes(x = curDur, y = m_m_repDur-curDur,  shape = as.factor(WMSize), color=as.factor(WMSize))) +
+## Figures in the MS
+RP_bias_all<-ggarrange(RP_bias, RP_bias_Exp4b, common.legend = FALSE, ncol=2, nrow=1, widths = c(4,1.4),  labels = c("a", "b"))
+ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias_all.png"), RP_bias_all, width = 9, height = 4.5)
+RP_bias_all
+```
+
+```{r}
+RP_bias_1_4b <- ggplot(data = AllDat_predY %>% 
+                         dplyr::group_by(Exp, curDur, WMSize, gap) %>% 
+                         dplyr::summarize(m_mu_r = mean(mu_r), m_repDur = mean(repDur), n= n(), se_mu_r = sd(mu_r)/sqrt(n-1)), aes(x = curDur, y = m_repDur - curDur, group = interaction(gap, WMSize), color=as.factor(WMSize), shape = as.factor(WMSize))) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data= AllDat_newY %>% 
+              dplyr::group_by(Exp, curDur, WMSize, gap) %>% 
+              dplyr::summarize(m_mu_r = mean(mu_r),  n= n(), se_mu_r = sd(mu_r)/sqrt(n-1)), aes(x=curDur, y=m_mu_r-curDur, group = interaction(WMSize, gap), linetype = gap, color=WMSize)) +
+  geom_hline(yintercept = 0, linetype='dashed')+
+  facet_grid(cols = vars(Exp), labeller = labeller(Exp = Exp.labs.2lines)) +
+  labs(x=" ", y="Reproduction bias (s)", shape ="Memory Load", linetype = "Gap", color = "Memory Load")+theme_new+
+  colorSet3+
+  theme(legend.position = "top")
+ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias_1_4b.png"), RP_bias_1_4b, width = 9, height = 4)
+RP_bias_1_4b
+```
+
+
+
+
+
+
+```{r}
+AllExpData[which(AllExpData$Exp != "Exp. 4b"), "gap"] = 1
+AllExpData$gap = factor(AllExpData$gap, labels = c("short", "long"))
+
+m_obsRP = AllExpData %>% dplyr::group_by(Exp, curDur, WMSize, NSub, gap) %>% 
+                             dplyr::summarize(n = n(),
+                                              m_repDur = mean(repDur),
+                                              se_repDur = sd(repDur)/sqrt(n-1)) %>%
+                             dplyr::group_by(Exp, curDur, WMSize, gap) %>% 
+                             dplyr::summarize(m_m_repDur = mean(m_repDur),
+                                              m_se_repDur = mean(se_repDur))
+
+RP_bias_obs_gap  <- ggplot(data = m_obsRP, aes(x = curDur, y = m_m_repDur-curDur,shape = as.factor(WMSize), color=as.factor(WMSize), linetype = factor(gap))) +
   geom_point()+
   geom_line()+
-  geom_errorbar(width=.2,  aes(ymin = m_m_repDur-curDur - m_se_repDur, ymax = m_m_repDur -curDur + m_se_repDur)) +
+  geom_errorbar(width=.1,  aes(ymin = m_m_repDur-curDur - m_se_repDur, ymax = m_m_repDur -curDur + m_se_repDur, linetype = gap)) +
   geom_hline(yintercept = 0, linetype='dashed')+
-  facet_grid(cols = vars(Exp)) +
+  facet_grid(cols = vars(Exp), labeller = labeller(Exp = Exp.labs.2lines)) +
+  labs(x="Sample intervals (s)", y="Reproduction bias(s)", shape="Memory Load", color = "Memory Load", linetype = "Gap")+
+  theme_new+colorSet3+
+  scale_x_continuous(breaks=seq(0, 1.6, 0.4))+ theme(legend.position="top")
+
+ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias_obs_gap.png"), RP_bias_obs_gap, width = 9, height = 4)
+
+RP_bias_obs_gap
+```
+
+```{r}
+RP_bias_obs  <- ggplot(data = m_obsRP%>%filter(Exp != 'Exp. 4b'), aes(x = curDur, y = m_m_repDur-curDur,shape = as.factor(WMSize), color=as.factor(WMSize))) +
+  geom_point()+
+  geom_line()+
+  geom_errorbar(width=.1,  aes(ymin = m_m_repDur-curDur - m_se_repDur, ymax = m_m_repDur -curDur + m_se_repDur)) +
+  geom_hline(yintercept = 0, linetype='dashed')+
+  facet_grid(cols = vars(Exp), labeller = labeller(Exp = Exp.labs.2lines)) +
   labs(x="Sample intervals (s)", y="Reproduction bias(s)", shape="Memory Load", color = "Memory Load")+
   theme_new+colorSet3+
-   scale_x_continuous(breaks=seq(0, 1.6, 0.4))+ theme(legend.position="top")
-
-ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias_obs.png"), RP_bias_obs, width = 6, height = 4)
+  scale_x_continuous(breaks=seq(0, 1.6, 0.4))+ theme(legend.position="top")
 
 RP_bias_obs
 ```
+```{r}
+RP_bias_obs_4b  <- ggplot(data = m_obsRP%>%filter(Exp == 'Exp. 4b'), aes(x = curDur, y = m_m_repDur-curDur,shape = as.factor(WMSize), color=as.factor(WMSize), linetype = factor(gap))) +
+  geom_point()+
+  geom_line()+
+  geom_errorbar(width=.1,  aes(ymin = m_m_repDur-curDur - m_se_repDur, ymax = m_m_repDur -curDur + m_se_repDur, linetype = gap)) +
+  geom_hline(yintercept = 0, linetype='dashed')+
+  facet_grid(cols = vars(Exp), labeller = labeller(Exp = Exp.labs.2lines)) +
+  labs(x="Sample intervals (s)", y="Reproduction bias(s)", linetype = "Gap")+
+  theme_new+colorSet3+
+  scale_x_continuous(breaks=seq(0, 1.6, 0.4))+ theme(legend.position="top")+ylim(-0.5, 0.2)+guides(color = "none") +guides(shape = "none")
+
+RP_bias_obs_4b
+```
+
+
+```{r}
+## Figures in the MS
+RP_bias_obs_all<-ggarrange(RP_bias_obs, RP_bias_obs_4b, common.legend = FALSE, ncol=2, nrow=1, widths = c(4,1.4),  labels = c("a", "b"))
+ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias_obs_all.png"), RP_bias_obs_all, width = 9, height = 4.5)
+RP_bias_obs_all
+```
+
+
+
+
+
 # weight of prior
 
 ```{r}
@@ -367,9 +521,8 @@ plt_wp <- ggplot(data = AllDat_predY %>%dplyr::group_by(NSub, Exp, WMSize) %>% d
   geom_line(stat = "identity",position = position_dodge(width = 0.2))+
   geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
   geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
-  #coord_cartesian(ylim = c(0.5, 1)) +
   colorSet5+
-  labs(x = "", y = TeX("Weight of the prior $w_p$"), color = 'Memory Load', shape = 'Memory Load') +
+  labs(x = "", y = TeX("Weight of the prior $w_p$"), color = 'Memory Load', shape = 'Memory Load') + #scale_x_discrete(labels= Exp.labs.2lines)+
   theme_new + theme(legend.position="top")
 
 plt_wp
@@ -377,13 +530,117 @@ ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_wp.png"), plt_wp, width = 3
 ```
 
 
+```{r}
+m_wp = AllDat_predY %>%dplyr::group_by(NSub, Exp, WMSize, gap) %>% dplyr::summarise(m_wp = mean(wp)) %>%dplyr::group_by(Exp, WMSize, gap) %>% dplyr::summarise(mm_wp = mean(m_wp), n= n(), m_se_wp = sd(m_wp)/sqrt(n-1))
+
+plt_wp_gap <- ggplot(data = m_wp, aes(Exp, mm_wp, ymin = mm_wp - m_se_wp, ymax = mm_wp + m_se_wp, group =interaction(Exp, WMSize, gap), color = WMSize, linetype = gap, shape = WMSize))+
+  geom_line(stat = "identity", position = position_dodge(width = 0.3))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.3))+
+  geom_errorbar(width=.3,  position = position_dodge(width = .3)) +
+  colorSet5+
+  labs(x = "", y = TeX("Weight of the prior $w_p$"), color = 'Memory Load', shape = 'Memory Load', linetype= 'Gap') +
+  theme_new + theme(legend.position="top")
+
+plt_wp_gap 
+```
+
+
 # Indifference Point and slope
 
 
-##  Indifference point and slope
 
 
-### Observed data
+## Inifference Point (Equation)
+
+```{r}
+sub_wp = AllDat_predY %>%dplyr::group_by(NSub, Exp, gap) %>% dplyr::summarise(wp = mean(wp)) 
+Bayparlist$gap = 'short'
+Bayparlist_4b = Bayparlist%>%filter(Exp == 'Exp. 4b')
+Bayparlist_4b$gap = 'long'
+Bayparlist_all = rbind(Bayparlist, Bayparlist_4b)
+```
+
+
+```{r}
+# Indifference Point based on Equation 10 in manuscript
+Eq_Inp_list <- dplyr::left_join(Bayparlist_all, sub_wp) %>% 
+  dplyr::group_by(NSub, Exp)  %>%
+  mutate(sig_post = sig_pr2_log * wp) %>%
+  mutate(InP1_log = (kr*log(1)-(1-wp)*ks*log(1)+ sig_post/2 +wp*mu_pr_log)/wp)%>%
+  mutate(InP1 = exp(InP1_log)) %>%
+  mutate(InP3_log = (kr*log(3)-(1-wp)*ks*log(3)+ sig_post/2 +wp*mu_pr_log)/wp)%>%
+  mutate(InP3 = exp(InP3_log)) %>%
+  mutate(InP5_log = (kr*log(5)-(1-wp)*ks*log(5)+ sig_post/2 +wp*mu_pr_log)/wp)%>%
+  mutate(InP5 = exp(InP5_log)) %>%
+  dplyr::select(NSub, Exp,gap, InP1, InP3, InP5)
+write.csv(Eq_Inp_list, paste0(modelPath, '/rlt/Eq_Inp_list.csv'))
+```
+
+```{r}
+m_Eq_Inp_list = Eq_Inp_list %>%
+  pivot_longer(cols = starts_with("InP"), names_to = "WMSize", names_prefix = "InP", values_to = "InP")
+m_Eq_Inp_list$gap = factor(m_Eq_Inp_list$gap, levels = c("short", "long"))
+
+m_Eq_Inp_list$WMSize <- factor(m_Eq_Inp_list$WMSize, labels = c("low", "medium",  "high")) 
+plt_Inp_eq =  m_Eq_Inp_list%>%dplyr::group_by(Exp, WMSize, gap)%>%
+  dplyr::summarise(m_inP= mean(InP), n =n(), se_inP = sd(InP)/sqrt(n()-1)) %>%ggplot(aes(x= Exp, y=m_inP, color = WMSize, shape = WMSize, linetype = factor(gap)))+
+  geom_line(stat = "identity",position = position_dodge(width = 0.3))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.3))+ 
+  geom_errorbar(width=.3,  aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP), position = position_dodge(width = 0.3)) +theme_new+
+  labs(colour = "Memory Load", shape = "Memory Load", linetype = "Gap")+colorSet3+
+  xlab(' ')+ylab("Indifference point (s)")+
+  theme(legend.position = "top") 
+plt_Inp_eq
+
+ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_Inp_eq.svg"), plt_Inp_eq, width = 5, height = 5)
+
+```
+
+```{r}
+dat = Eq_Inp_list%>%filter(Exp %in%c('Exp. 2', 'Exp. 3'))
+
+dat$high_low_2 = 0.5 * (dat$InP5 - dat$InP1)
+dat1 = dat %>% dplyr::select(c("Exp","NSub","high_low_2")) %>%pivot_wider(names_from =c('Exp'), values_from = c(high_low_2))
+
+dat1$Exp2_3 = dat1$`Exp. 2` - dat1$`Exp. 3`
+mean(dat1$Exp2_3)
+sd(dat1$Exp2_3)/sqrt(15)
+```
+
+```{r}
+mean(dat1$`Exp. 3`)
+sd(dat1$`Exp. 3`)/sqrt(15)
+```
+
+
+
+## Inifference Point (curve)
+
+```{r}
+AllDat_newY$predErr = AllDat_newY$mu_r - AllDat_newY$curDur
+
+temp_newY <- AllDat_newY %>% filter(!(Exp == 'Exp. 4a' & Gap == 2500))  %>% select(Exp, WMSize, NSub, predErr, curDur, gap)
+
+InP_curve<- temp_newY %>% dplyr::group_by(Exp, WMSize, NSub, gap)%>%
+  dplyr::summarise(minErr = min(abs(predErr)), idx = which.min(abs(predErr)))
+InP_curve$InP_curve = temp_newY[InP_curve$idx,]$curDur 
+InP_curve$y = temp_newY[InP_curve$idx,]$predErr + temp_newY[InP_curve$idx,]$curDur
+
+#plot indifference points (the intersections of the Prediction curve with the diagonal)
+plt_InP_curve<- ggplot(data = InP_curve%>%dplyr::group_by(Exp, WMSize, gap)%>% dplyr::summarise(m_InP = mean(InP_curve), se_InP = sd(InP_curve)/sqrt(n()-1)), aes(x= Exp, y=m_InP, color = as.factor(WMSize), linetype = factor(gap), shape = as.factor(WMSize)))+
+  geom_line(stat = "identity",position = position_dodge(width = 0.3))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.3))+ 
+  geom_errorbar(width=.3,  aes(ymin = m_InP - se_InP, ymax = m_InP + se_InP), position = position_dodge(width = 0.3)) +theme_new+
+  labs(colour = "Memory Load", shape ="Memory Load")+colorSet3+
+  xlab(' ')+ylab("indifference point (s)")+
+  theme(legend.position = "top")
+
+
+ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_InP_curve.png"), plt_InP_curve, width = 3, height = 3)
+plt_InP_curve
+```
+
+### Observed RP
 
 ```{r}
 #Observed Indifference Point for Exp. 4b
@@ -402,6 +659,7 @@ obs_Inp_list <- AllDat_predY %>%
 obs_Inp_list$model = NULL
 obs_Inp_list$data = NULL
 obs_Inp_list$inP = obs_Inp_list$Intercept /(1-obs_Inp_list$slope)
+obs_Inp_list$slope = -1 * obs_Inp_list$slope
 ```
 
 
@@ -418,6 +676,7 @@ obs_Inp_list_no_gap <- AllDat_predY %>%
 obs_Inp_list_no_gap$model = NULL
 obs_Inp_list_no_gap$data = NULL
 obs_Inp_list_no_gap$inP = obs_Inp_list_no_gap$Intercept /(1-obs_Inp_list_no_gap$slope)
+obs_Inp_list_no_gap$slope = -1 * obs_Inp_list_no_gap$slope
 ```
 
 
@@ -431,11 +690,11 @@ ezANOVA(data = obs_Inp_list%>%filter(Exp =='Exp. 4b'), dv= inP, wid=NSub, within
 ```{r}
 # plot the observed indifference points and slopes of RP
 plt_obs_InP_slope_err<- ggplot(data = obs_Inp_list %>% group_by(Exp, WMSize)%>%
-  dplyr::summarise(n=n(),
-                   m_inP = mean(inP),
-                   se_inP = sd(inP)/sqrt(n-1),
-                   m_slope = mean(slope),
-                   se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y=m_inP, color = WMSize, shape = WMSize))+
+                                 dplyr::summarise(n=n(),
+                                                  m_inP = mean(inP),
+                                                  se_inP = sd(inP)/sqrt(n-1),
+                                                  m_slope = mean(slope),
+                                                  se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y=m_inP, color = WMSize, shape = WMSize))+
   geom_line(stat = "identity")+
   geom_point(stat = "identity")+ 
   geom_errorbar(width = 0.02, aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP)) +
@@ -445,8 +704,6 @@ plt_obs_InP_slope_err<- ggplot(data = obs_Inp_list %>% group_by(Exp, WMSize)%>%
   facet_grid(~Exp)+
   xlab('slope of reproduction bias')+ylab("indifference point (s)")+
   theme(legend.position = "top")
-
-
 ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_obs_InP_slope_err.png"), plt_obs_InP_slope_err, width = 5, height = 5)
 
 plt_obs_InP_slope_err
@@ -454,7 +711,7 @@ plt_obs_InP_slope_err
 
 
 
-### Predicated data
+### Predicated RP
 
 ```{r}
 #Predicated Indifference Point for Exp.4b
@@ -473,6 +730,7 @@ pred_Inp_list <- AllDat_predY %>%
 pred_Inp_list$model = NULL
 pred_Inp_list$data = NULL
 pred_Inp_list$pred_inP = pred_Inp_list$Intercept /(1-pred_Inp_list$pred_slope)
+pred_Inp_list$pred_slope = -1 * pred_Inp_list$pred_slope
 ```
 
 ```{r}
@@ -487,6 +745,7 @@ pred_Inp_slope_no_gap <- AllDat_predY %>%
 pred_Inp_slope_no_gap$model = NULL
 pred_Inp_slope_no_gap$data = NULL
 pred_Inp_slope_no_gap$pred_inP = pred_Inp_slope_no_gap$Intercept /(1-pred_Inp_slope_no_gap$pred_slope)
+pred_Inp_slope_no_gap$pred_slope = -1 * pred_Inp_slope_no_gap$pred_slope
 ```
 
 
@@ -509,11 +768,11 @@ plt_pred_InP_slope_err<- ggplot(data = m_pred_Inp_slope_no_gap, aes(x= m_pred_sl
   geom_errorbar(width = 0.02, aes(ymin = m_pred_inP - se_pred_inP, ymax = m_pred_inP + se_pred_inP)) +
   geom_errorbarh(height =0.02, aes(xmin = m_pred_slope - se_pred_slope, xmax = m_pred_slope + se_pred_slope)) +
   geom_point(data = obs_Inp_list%>% group_by(Exp, WMSize)%>%
-  dplyr::summarise(n=n(),
-                   m_inP = mean(inP),
-                   se_inP = sd(inP)/sqrt(n-1),
-                   m_slope = mean(slope),
-                   se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y =m_inP, color = WMSize, shape = WMSize))+
+               dplyr::summarise(n=n(),
+                                m_inP = mean(inP),
+                                se_inP = sd(inP)/sqrt(n-1),
+                                m_slope = mean(slope),
+                                se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y =m_inP, color = WMSize, shape = WMSize))+
   theme_new+
   labs(colour = "Memory Load", shape = "Memory Load")+colorSet3+
   facet_grid(~Exp)+
@@ -529,9 +788,9 @@ plt_pred_InP_slope_err
 
 ```{r}
 InP_obs<-  ggplot(data = obs_Inp_list_no_gap %>%dplyr::group_by(WMSize, Exp) %>%dplyr::summarise(m_inP = mean(inP), se_inP = sd(inP)/sqrt(n()-1)), aes(x= Exp, y=m_inP, color = WMSize, shape = WMSize))+
-  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
-  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
-  geom_errorbar(width=.2,  aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP), position = position_dodge(width = 0.2)) +theme_new+
+  geom_line(stat = "identity",position = position_dodge(width = 0.3))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.3))+ 
+  geom_errorbar(width=.3,  aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP), position = position_dodge(width = 0.3)) +theme_new+
   labs(colour = "Memory Load", shape = "Memory Load")+colorSet3+
   xlab(' ')+ylab("observed indifference point (s)")+
   theme(legend.position = "top")
@@ -542,10 +801,10 @@ InP_obs
 
 ```{r}
 InP_pred<-  ggplot(data = m_pred_Inp_slope_no_gap, aes(x= Exp, y=m_pred_inP, color = WMSize, shape = WMSize))+
-  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
-  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
-  geom_errorbar(width=.2,  aes(ymin = m_pred_inP - se_pred_inP, ymax = m_pred_inP + se_pred_inP), position = position_dodge(width = 0.2)) +theme_new+
-  labs(colour = "Memory Load")+colorSet3+
+  geom_line(stat = "identity",position = position_dodge(width = 0.3))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.3))+ 
+  geom_errorbar(width=.3,  aes(ymin = m_pred_inP - se_pred_inP, ymax = m_pred_inP + se_pred_inP), position = position_dodge(width = 0.3)) +theme_new+
+  labs(colour = "Memory Load", shape = "Memory Load")+colorSet3+ #scale_x_discrete(labels= Exp.labs.2lines)+
   xlab(' ')+ylab("indifference point (s)")+
   theme(legend.position = "top")
 
@@ -555,19 +814,11 @@ InP_pred
 ```
 
 
-
-
-
-
-
-
-
 ```{r}
 ### Calculate predication error
 Inp_list_no_gap = left_join(obs_Inp_list_no_gap, pred_Inp_slope_no_gap, by = c("NSub", "Exp", "WMSize"))
 Inp_list_no_gap$InP_err = Inp_list_no_gap$pred_inP -Inp_list_no_gap$inP
 Inp_list_no_gap$InP_rerr = 100*Inp_list_no_gap$InP_err/ Inp_list_no_gap$inP
-
 
 Inp_list_no_gap$slope_err = Inp_list_no_gap$pred_slope - Inp_list_no_gap$slope
 Inp_list_no_gap$slope_rerr = 100* Inp_list_no_gap$slope_err/Inp_list_no_gap$slope
@@ -579,16 +830,19 @@ m_Inp_list_no_gap$slope_auc = 100-  m_Inp_list_no_gap$m_slope_rerr_abs
 ```
 
 
+
+x
+
 # plot figures
 
 ```{r}
 #plot the predicated indifference points and slope of predicated RP
 plt_pred_InP_slope_err<- ggplot(data = obs_Inp_list_no_gap%>% dplyr::group_by(Exp, WMSize)%>%
-  dplyr::summarise(n=n(),
-                   m_inP = mean(inP),
-                   se_inP = sd(inP)/sqrt(n-1),
-                   m_slope = mean(slope),
-                   se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y=m_inP, shape = WMSize, color = WMSize))+
+                                  dplyr::summarise(n=n(),
+                                                   m_inP = mean(inP),
+                                                   se_inP = sd(inP)/sqrt(n-1),
+                                                   m_slope = mean(slope),
+                                                   se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y=m_inP, shape = WMSize, color = WMSize))+
   geom_line(stat = "identity")+
   geom_point(stat = "identity")+ 
   geom_errorbar(width = 0.02, aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP)) +
@@ -612,6 +866,12 @@ ggsave(paste0(getwd(), "/", modelPath, "/figures/fig3.png"), fig3, width = 6, he
 fig3
 ```
 
+```{r}
+## combine InP and wp 
+fig_wp_InP_gap<-ggarrange(plt_wp_gap, plt_Inp_eq, common.legend = TRUE, ncol=2, nrow=1,  labels = c("a", "b"))
+ggsave(paste0(getwd(), "/", modelPath, "/figures/fig_wp_InP_gap.png"), fig_wp_InP_gap, width = 6, height = 3)
+fig_wp_InP_gap
+```
 
 ```{r}
 ## combine InP and wp 
@@ -671,10 +931,10 @@ plt_Err_CV_all = ggplot(m_predErr_all, aes(abs(mmpredRP_err), abs(mmpredcv_err),
   scale_shape_manual(values = c(6, 7, 16, 17,8)) +
   theme_new+ 
   theme(legend.position = 'top')+
- labs(size = 'Memory Load')+
+  labs(size = 'Memory Load')+
   guides(colour = guide_legend(order = 1, nrow=2,byrow=TRUE),
          shape = guide_legend(order =2, nrow=2,byrow=TRUE),
-            size = guide_legend(order = 3, nrow=3,byrow=TRUE))
+         size = guide_legend(order = 3, nrow=3,byrow=TRUE))
 
 ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_Err_CV_all.png"), plt_Err_CV_all, width = 7, height = 4)
 
@@ -698,7 +958,7 @@ m_predY_acc
 
 
 
-# Export data for spss
+# Export data for spss{-}
 
 ```{r include=FALSE}
 obs_Inp_slope_Exp1_jasp <- obs_Inp_list_no_gap %>% filter(Exp == 'Exp. 1') %>% dplyr::select(c("WMSize", "NSub","inP", "slope"))%>% pivot_wider(names_from = c("WMSize"), values_from = c(inP, slope), names_sep="_")
@@ -747,123 +1007,3 @@ write.csv(m_WAIC, paste0(modelPath, "/rlt/m_WAIC.csv"))
 write.csv(mm_Baypar,paste0(modelPath, '/rlt/mBaypar.csv'))
 ```
 
-
-# Linear Mixed-Effects Models 
-
-```{r include=FALSE}
-library(tidyverse)
-library(MASS)
-library(lme4)
-library(lmerTest)
-library(sjPlot)
-AllValidData <- read_csv("../data/AllValidData.csv")
-AllValidData$exp = substr(AllValidData$Exp, 4, 4)
-AllValidData$Sub = as.numeric(AllValidData$exp)*100 + AllValidData$NSub
-AllValidData$memory = (AllValidData$WMSize-1)/2  # memory load 0, 1, 2
-```
-
-Preliminary investigation using standard linear model to get first impression.
-
-```{r}
-mRep = AllValidData %>% filter(repDur > 0.2, repDur < 4) %>%
-  group_by(Exp, Sub, WMSize, curDur) %>% 
-  summarise(Rep = mean(repDur)) %>%
-  mutate(bias = Rep - curDur)
-mRep$cond = mRep$Exp #avoid confusion from output Exp --> Cond
-mRep$memory = (mRep$WMSize-1)/2  # memory load 0, 1, 2
-
-lm(Rep ~ Exp*curDur*WMSize,
-            data = mRep)
-```
-It seems that working memory impacts on the central tendency, as the interaction term WMSize x Duration varied across experiments.
-
-To make a formal analysis, we use linear mixed model. Given that Experiment 1 was a baseline checking the duration reproduciton was not impacted by the sequential presentation, we leave this experiment out for cross-experiment analysis.
-
-Given that we are interested how memory manipulation influence duration reproduction on the encoding and reproduction stages, the cross-experiment analysis mainly focuses on the manipulation stage.
-
-Here are the experimental design:
-
-Exp. 2: Memory load on the encoding stage Exp. 3: Memory load on the reproduction stage Exp. 4a (coded: 4): Memory load on both stages Exp. 4b (coded: 5): Memory load on both stage + additional 2 sec gap.
-
-We are interested the following comparisons: 1. encoding vs. reproduction (Exp. 2 vs. Exp. 3) 2. individual impact vs. combination (exp. 2 + exp. 3 vs. Exp. 4a) 3. Gap effect (Exp. 4a vs. 4b )
-
-Thus we construct the contrast matrix as follows:
-
-$$\begin{matrix}
-1 & -1 & 0 & 0 \\
-0.5 & 0.5 & -1 & 0\\
-0 & 0 & 1 & -1
-\end{matrix}$$
-
-
-In addition, we assume in each experiment, the slope and intercept of the reproduction could be covaried across different memory loads for individuals.
-
-```{r}
-# contrast among experiment. 
-# we want to compare 
-# 1. E2 vs E3 (encoding vs. reprod)
-# 2. combination of two phases vs. spanning: E2 + E3 vs. E4a
-# 3. gap: E4a vs. E4b
-
-contr = rbind(c(1, -1, 0, 0), 
-             c(0.5, 0.5, -1, 0),
-             c(0, 0, 1, -1))
-cmat = ginv(contr)
-
-# Linear mixed model 
-mod1 = lmer(bias ~ cond*curDur*memory + 
-              (curDur * memory|Sub),  
-            contrasts = list(cond = cmat), 
-            data = mRep %>% filter(cond != 'Exp1'), REML = FALSE)
-summary(mod1)
-```
-```{r}
-anova(mod1)
-```
-
-```{r}
-tab_model(mod1)
-```
-
-**Interpretation of the results**
-
--The overall central tendency across all experiments was significant. The mean central tendency index was 0.45.
-
--The main effect of Memory Load was also significant. Increase memory load one level elevated the bias for 22 ms. (Overestimation)
-
--There was no significant difference of mean central tendency effect for those comparisons we were interested in (the above three comparison).
-
--Memory load, however, impacted differently. There was different impact of memory between Exp. 2 and 3., Exp2 + Exp 3 vs. Exp. 4. But there was no much difference between Exp 4 and 5 (4a vs. 4b)
-
--There was a strong interaction between memory and duration (central tendency). Increase one memory load level, the central tendency would increase 2.6% on average.
-
--The impact of memory on central tendency significantly differ among three contrasts (comparisons). 1. Difference between Exp 2 vs. 3. 2. Exp. 4 differred from the combination of Exp. 2 and 3. (i.e., no complete cancel each other on the central tendency when memory load was imposed on both stages) 3. Adding a gap inbetween increased 3.3% central tendency.
-
-
-
-
-## BF
-
-```{r}
-library(BayesFactor)
-mpredY_sub$NSub = as.numeric(mpredY_sub$NSub)
-
-bfFull = lmBF(RP_Bias ~ WMSize + curDur + WMSize:curDur + NSub, data = mpredY_sub%>%filter(Exp =='Exp. 1'), whichRandom = "NSub")
-
-## Bayes factor of main effects only against null
-bfMain = lmBF(RP_Bias ~ WMSize + curDur + NSub, data = mpredY_sub%>%filter(Exp =='Exp. 1'), whichRandom = "NSub")
-## Compare the main-effects only model to the full model
-bfMain / bfFull
-
-
-## Bayes factor of main effects only against null
-bfWMSize = lmBF(RP_Bias ~ WMSize + NSub, data = mpredY_sub%>%filter(Exp =='Exp. 1'), whichRandom = "NSub")
-## Compare the main-effects only model to the full model
-bfWMSize / bfFull
-
-
-## Bayes factor of main effects only against null
-bfDur = lmBF(RP_Bias ~ curDur + NSub, data = mpredY_sub%>%filter(Exp =='Exp. 1'), whichRandom = "NSub")
-## Compare the main-effects only model to the full model
-bfDur / bfFull
-```
