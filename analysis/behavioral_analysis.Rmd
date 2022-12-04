@@ -29,17 +29,18 @@ Visualize the mean reproduction biases.
 
 ```{r meanplot, message=FALSE, warning=FALSE}
 mRep = raw %>% filter(repDur > 0.2, repDur < 4) %>%
-  group_by(Exp, NSub, WMSize, curDur) %>% 
+  group_by(Exp, NSub, WMSize, gap, curDur) %>% 
   summarise(Rep = mean(repDur)) %>%
   mutate(bias = Rep - curDur)
 
 mmRep = mRep%>% #within-subject average 
-  group_by(Exp, WMSize, curDur) %>%
+  group_by(Exp, WMSize, gap, curDur) %>%
   summarise(mBias = mean(bias), se = sd(bias)/sqrt(n()), n = n())
 mmRep$WMSize = as.factor(mmRep$WMSize)
 
+mmRep$gap = as.factor(mmRep$gap)
 # visualize the biases
-ggplot(data = mmRep, aes(curDur, mBias, color = WMSize)) + 
+ggplot(data = mmRep %>% filter(Exp == 'Exp5'), aes(curDur, mBias, linetype = gap, color = WMSize)) + 
   geom_point() + geom_line() + 
   geom_errorbar(aes(ymin = mBias - se, ymax = mBias + se), width = 0.1) +
   facet_wrap(~Exp) + theme_minimal()
@@ -75,7 +76,7 @@ Thus we construct the contrast matrix as follows:
 $$\begin{equation*}
 C = \begin{pmatrix}
 1 & -1 & 0 & 0 \\
-0.5 & 0.5 & -1 & 0 \\
+1 & 0 & -1 & 0 \\
 0 & 0 & 1 & -1
 \end{pmatrix}
 \end{equation*}
@@ -108,6 +109,9 @@ anova(mod1)
 tab_model(mod1, digits = 3)
 ```
 
+
+
+
 __Interpretation of the results__
 
 * The overall central tendency across all experiments was significant.
@@ -127,6 +131,22 @@ The mean central tendency index was 0.45.
       3. Adding a gap inbetween increased 3.3% central tendency. 
       
       
+### LMM for Exp. 4b
+```{r}
+mod4b = lmer(bias ~ gap*duration*memory + 
+              (gap*duration*memory|NSub),  
+            data = mRep %>% filter(Exp == 'Exp5'), REML = FALSE)
+summary(mod4b)
+anova(mod4b)
+tab_model(mod4b, digits = 3)
+
+```
+
+### IPs from the model
+
+```{r}
+
+```
 
 
 
