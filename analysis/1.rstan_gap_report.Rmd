@@ -512,28 +512,10 @@ RP_bias_obs_all
 
 
 
-
-
-# weight of prior
-
 ```{r}
-plt_wp <- ggplot(data = AllDat_predY %>%dplyr::group_by(NSub, Exp, WMSize) %>% dplyr::summarise(m_wp = mean(wp)) %>%dplyr::group_by(Exp, WMSize) %>% dplyr::summarise(mm_wp = mean(m_wp), n= n(), m_se_wp = sd(m_wp)/sqrt(n-1)), aes(Exp, mm_wp, ymin = mm_wp - m_se_wp, ymax = mm_wp + m_se_wp, group =interaction(Exp, WMSize), color = WMSize, shape = as.factor(WMSize)))+ 
-  geom_line(stat = "identity",position = position_dodge(width = 0.2))+
-  geom_point(stat = "identity",position = position_dodge(width = 0.2))+ 
-  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
-  colorSet5+
-  labs(x = "", y = TeX("Weight of the prior $w_p$"), color = 'Memory Load', shape = 'Memory Load') + #scale_x_discrete(labels= Exp.labs.2lines)+
-  theme_new + theme(legend.position="top")
+m_wp = AllDat_predY %>%dplyr::group_by(NSub, Exp, WMSize, gap) %>% dplyr::summarise(m_wp = mean(wp))
 
-plt_wp
-ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_wp.png"), plt_wp, width = 3, height = 3)
-```
-
-
-```{r}
-m_wp = AllDat_predY %>%dplyr::group_by(NSub, Exp, WMSize, gap) %>% dplyr::summarise(m_wp = mean(wp)) %>%dplyr::group_by(Exp, WMSize, gap) %>% dplyr::summarise(mm_wp = mean(m_wp), n= n(), m_se_wp = sd(m_wp)/sqrt(n-1))
-
-plt_wp_gap <- ggplot(data = m_wp, aes(Exp, mm_wp, ymin = mm_wp - m_se_wp, ymax = mm_wp + m_se_wp, group =interaction(Exp, WMSize, gap), color = WMSize, linetype = gap, shape = WMSize))+
+plt_wp_gap <-ggplot(data = m_wp%>%dplyr::group_by(Exp, WMSize, gap) %>% dplyr::summarise(mm_wp = mean(m_wp), n= n(), m_se_wp = sd(m_wp)/sqrt(n-1)), aes(Exp, mm_wp, ymin = mm_wp - m_se_wp, ymax = mm_wp + m_se_wp, group =interaction(Exp, WMSize, gap), color = WMSize, linetype = gap, shape = WMSize))+
   geom_line(stat = "identity", position = position_dodge(width = 0.3))+
   geom_point(stat = "identity",position = position_dodge(width = 0.3))+
   geom_errorbar(width=.3,  position = position_dodge(width = .3)) +
@@ -543,12 +525,23 @@ plt_wp_gap <- ggplot(data = m_wp, aes(Exp, mm_wp, ymin = mm_wp - m_se_wp, ymax =
 
 plt_wp_gap 
 ```
+```{r}
+ #anova analysis on weight of prior
+wp_sub = m_wp %>%filter(Exp =='Exp. 4b')%>% pivot_wider(names_from = c("WMSize", "gap"), values_from = c(m_wp), names_sep="_")
+write.csv(wp_sub, paste0(modelPath, '/rlt/wp_sub.csv'))
+```
 
+
+```{r}
+model <-ezANOVA(data= m_wp %>%filter(Exp =='Exp. 4b'), dv = m_wp, wid = NSub, within = .(WMSize, gap), type = 3, detailed = T)
+model
+```
+
+```{r}
+model$ANOVA[4] / (model$ANOVA[4] + model$ANOVA[5])  
+```
 
 # Indifference Point and slope
-
-
-
 
 ## Inifference Point (Equation)
 
@@ -614,31 +607,7 @@ sd(dat1$`Exp. 3`)/sqrt(15)
 
 
 
-## Inifference Point (curve)
 
-```{r}
-AllDat_newY$predErr = AllDat_newY$mu_r - AllDat_newY$curDur
-
-temp_newY <- AllDat_newY %>% filter(!(Exp == 'Exp. 4a' & Gap == 2500))  %>% select(Exp, WMSize, NSub, predErr, curDur, gap)
-
-InP_curve<- temp_newY %>% dplyr::group_by(Exp, WMSize, NSub, gap)%>%
-  dplyr::summarise(minErr = min(abs(predErr)), idx = which.min(abs(predErr)))
-InP_curve$InP_curve = temp_newY[InP_curve$idx,]$curDur 
-InP_curve$y = temp_newY[InP_curve$idx,]$predErr + temp_newY[InP_curve$idx,]$curDur
-
-#plot indifference points (the intersections of the Prediction curve with the diagonal)
-plt_InP_curve<- ggplot(data = InP_curve%>%dplyr::group_by(Exp, WMSize, gap)%>% dplyr::summarise(m_InP = mean(InP_curve), se_InP = sd(InP_curve)/sqrt(n()-1)), aes(x= Exp, y=m_InP, color = as.factor(WMSize), linetype = factor(gap), shape = as.factor(WMSize)))+
-  geom_line(stat = "identity",position = position_dodge(width = 0.3))+
-  geom_point(stat = "identity",position = position_dodge(width = 0.3))+ 
-  geom_errorbar(width=.3,  aes(ymin = m_InP - se_InP, ymax = m_InP + se_InP), position = position_dodge(width = 0.3)) +theme_new+
-  labs(colour = "Memory Load", shape ="Memory Load")+colorSet3+
-  xlab(' ')+ylab("indifference point (s)")+
-  theme(legend.position = "top")
-
-
-ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_InP_curve.png"), plt_InP_curve, width = 3, height = 3)
-plt_InP_curve
-```
 
 ### Observed RP
 
@@ -684,31 +653,6 @@ obs_Inp_list_no_gap$slope = -1 * obs_Inp_list_no_gap$slope
 ```{r}
 ezANOVA(data = obs_Inp_list%>%filter(Exp =='Exp. 4b'), dv= inP, wid=NSub, within= .(gap, WMSize) )
 ```
-
-
-
-```{r}
-# plot the observed indifference points and slopes of RP
-plt_obs_InP_slope_err<- ggplot(data = obs_Inp_list %>% group_by(Exp, WMSize)%>%
-                                 dplyr::summarise(n=n(),
-                                                  m_inP = mean(inP),
-                                                  se_inP = sd(inP)/sqrt(n-1),
-                                                  m_slope = mean(slope),
-                                                  se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y=m_inP, color = WMSize, shape = WMSize))+
-  geom_line(stat = "identity")+
-  geom_point(stat = "identity")+ 
-  geom_errorbar(width = 0.02, aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP)) +
-  geom_errorbarh(height =0.02, aes(xmin = m_slope - se_slope, xmax = m_slope + se_slope)) +
-  theme_new+
-  labs(colour = "Memory Load", shape = "Memory Load")+colorSet3+
-  facet_grid(~Exp)+
-  xlab('slope of reproduction bias')+ylab("indifference point (s)")+
-  theme(legend.position = "top")
-ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_obs_InP_slope_err.png"), plt_obs_InP_slope_err, width = 5, height = 5)
-
-plt_obs_InP_slope_err
-```
-
 
 
 ### Predicated RP
@@ -761,30 +705,6 @@ m_pred_Inp_slope_no_gap = pred_Inp_slope_no_gap %>% group_by(Exp, WMSize)%>%
 ```
 
 
-```{r}
-# plot the observed indifference points and slopes of RP
-plt_pred_InP_slope_err<- ggplot(data = m_pred_Inp_slope_no_gap, aes(x= m_pred_slope, y=m_pred_inP, color = WMSize, shape = WMSize))+
-  geom_line(stat = "identity")+geom_point(stat = "identity")+ 
-  geom_errorbar(width = 0.02, aes(ymin = m_pred_inP - se_pred_inP, ymax = m_pred_inP + se_pred_inP)) +
-  geom_errorbarh(height =0.02, aes(xmin = m_pred_slope - se_pred_slope, xmax = m_pred_slope + se_pred_slope)) +
-  geom_point(data = obs_Inp_list%>% group_by(Exp, WMSize)%>%
-               dplyr::summarise(n=n(),
-                                m_inP = mean(inP),
-                                se_inP = sd(inP)/sqrt(n-1),
-                                m_slope = mean(slope),
-                                se_slope = sd(slope)/sqrt(n-1)), aes(x= m_slope, y =m_inP, color = WMSize, shape = WMSize))+
-  theme_new+
-  labs(colour = "Memory Load", shape = "Memory Load")+colorSet3+
-  facet_grid(~Exp)+
-  xlab('slope of reproduction')+ylab("indifference point (s)")+
-  theme(legend.position = "top")
-
-
-ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_pred_InP_slope_err.png"), plt_pred_InP_slope_err, width = 5, height = 5)
-
-plt_pred_InP_slope_err
-```
-
 
 ```{r}
 InP_obs<-  ggplot(data = obs_Inp_list_no_gap %>%dplyr::group_by(WMSize, Exp) %>%dplyr::summarise(m_inP = mean(inP), se_inP = sd(inP)/sqrt(n()-1)), aes(x= Exp, y=m_inP, color = WMSize, shape = WMSize))+
@@ -831,8 +751,6 @@ m_Inp_list_no_gap$slope_auc = 100-  m_Inp_list_no_gap$m_slope_rerr_abs
 
 
 
-x
-
 # plot figures
 
 ```{r}
@@ -873,12 +791,7 @@ ggsave(paste0(getwd(), "/", modelPath, "/figures/fig_wp_InP_gap.png"), fig_wp_In
 fig_wp_InP_gap
 ```
 
-```{r}
-## combine InP and wp 
-fig4<-ggarrange(plt_wp, InP_pred, common.legend = TRUE, ncol=2, nrow=1,  labels = c("a", "b"))
-ggsave(paste0(getwd(), "/", modelPath, "/figures/fig4.png"), fig4, width = 6, height = 3)
-fig4
-```
+
 
 
 # Model prediction error
@@ -928,13 +841,14 @@ plt_Err_CV_all = ggplot(m_predErr_all, aes(abs(mmpredRP_err), abs(mmpredcv_err),
   geom_point() +
   geom_hline(yintercept = round(max(temp$abs_mmpredcv_err), 4)+0.0005, linetype='dashed')+
   xlab('Prediction error in the RP means (s)')+ ylab('Prediction error in CV')+colorSet3+
-  scale_shape_manual(values = c(6, 7, 16, 17,8)) +
+  scale_shape_manual(values = c(1, 2, 6, 3,4)) +
   theme_new+ 
   theme(legend.position = 'top')+
   labs(size = 'Memory Load')+
   guides(colour = guide_legend(order = 1, nrow=2,byrow=TRUE),
          shape = guide_legend(order =2, nrow=2,byrow=TRUE),
-         size = guide_legend(order = 3, nrow=3,byrow=TRUE))
+         size = guide_legend(order = 3, nrow=3,byrow=TRUE))+
+  scale_color_manual(values = c("#E69F00", "black"))
 
 ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_Err_CV_all.png"), plt_Err_CV_all, width = 7, height = 4)
 
