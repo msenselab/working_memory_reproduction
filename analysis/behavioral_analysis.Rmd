@@ -142,11 +142,7 @@ tab_model(mod4b, digits = 3)
 
 ```
 
-### IPs from the model
 
-```{r}
-
-```
 
 
 

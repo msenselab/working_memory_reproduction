@@ -710,11 +710,3 @@ plt_ErrorScatter = ggplot(m_predErr_sub, aes(mpredRP_err, mpredVar_err, color = 
 
 plt_ErrorScatter
 ```
-
-
-
-```{r}
-bf_WMSize <- bfWMSize/bfMain
-
-bf_int <- bfFull/bfMain 
-```

@@ -1,7 +1,7 @@
 ---
 title: "Results of Logarithmic encoding model"
 author: "Xiuna Zhu, Xuelian Zang & Zhuanghua Shi"
-date: "24/10/2022"
+date: "24/11/2022"
 output:
   html_document:
     df_print: paged
