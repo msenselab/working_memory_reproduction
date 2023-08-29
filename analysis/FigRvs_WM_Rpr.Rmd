@@ -51,7 +51,7 @@ AllExpData$WMSize <- factor(AllExpData$WMSize, labels = c("low", "medium",  "hig
 AllExpData$Exp <- gsub("^.{0,3}", "Exp. ", AllExpData$Exp)
 
 # Exp 6
-Data_Exp6 <- read.csv(paste0("../data/Exp6.csv"))
+Data_Exp6 <- read.csv(paste0("../data/Exp6.csv")) %>% filter(valid == 1)
 Data_Exp6$WMSize <- factor(Data_Exp6$WMSize, labels = c("low", "medium",  "high"))
 
 # (2) calculate correct rates
@@ -140,7 +140,7 @@ plt_WMCrr_Exp6 <- ggplot(crrForExp6, aes(WMSize, mean_WMCrr, ymin = mean_WMCrr -
   geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
   coord_cartesian(ylim = c(0.5, 1)) +
   labs(x = "Memory load", y = "Mean accuracy") +
-  theme_new + theme(legend.position = "top", legend.justification = c(.9, .9), 
+  theme_new + theme(legend.position = "top", legend.justification = c(.8, .8), 
                     legend.text = element_text(size = 8), legend.title = element_text(size = 8, face = "bold"))
 
 plt_WMCrr_Exp1
@@ -163,24 +163,24 @@ AllExpData$Exp = as.factor(AllExpData$Exp)
 Data_Exp5 <- AllExpData %>% filter(Exp == "Exp. 5")
 Data_Exp5$gap <- factor(Data_Exp5$gap, labels = c("short", "long"))
 
-
-# (2) calculate the mean reproduction biases for the 5 given intervals for all subjects
+# (2) calculate the mean reproduction biases for the 5 given intervals for all participants
 mRpr_sub <- dplyr::group_by(AllExpData, curDur, Exp, NSub, WMSize) %>%
   dplyr::summarize(n = n(), 
-                   m_repDur = mean(repDur), 
+                   m_repDur = mean(repDur),
                    sd_repDur = sd(repDur),
                    cv =sd_repDur/ m_repDur)
 
 mRpr_sub_Exp5 <- dplyr::group_by(Data_Exp5, curDur, Exp, NSub, WMSize, gap) %>%
   dplyr::summarize(n = n(), 
-                   m_repDur = mean(repDur), 
+                   m_repDur = mean(repDur),
                    sd_repDur = sd(repDur),
                    cv =sd_repDur/ m_repDur)
 
 mRpr_sub_Exp6 <-  dplyr::group_by(Data_Exp6, curDur, Exp, NSub, WMSize) %>%
   dplyr::summarize(n = n(), 
-                   m_repDur = mean(repDur), 
+                   m_repDur = mean(repDur),
                    sd_repDur = sd(repDur),
+                   m_RT = mean(repWaitTime),
                    cv = sd_repDur/ m_repDur)
 
 ## calculate grand mean reproduction bias
@@ -205,8 +205,26 @@ mRpr_Exp6 <- mRpr_sub_Exp6 %>% dplyr::group_by(Exp, curDur, WMSize) %>%
                    m_m_repDur = mean(m_repDur),
                    m_bias = mean(m_repDur-curDur),
                    sd_bias = sd(m_repDur-curDur)/sqrt(n-1),
+                   m_mRT = mean(m_RT),
+                   sd_mRT = sd(m_RT)/sqrt(n-1),
                    m_cv= mean(cv),
                    sd_cv=sd(cv)/sqrt(n-1))
+
+# mark valid RT in Exp6
+# mRT_sub_Exp6_forFilter <-  dplyr::group_by(Data_Exp6, Exp, NSub) %>%
+#   dplyr::summarize(n = n(),
+#                    m_RT = mean(repWaitTime),
+#                    sd_RT = sd(repWaitTime)/sqrt(n-1))
+# mRT_sub_Exp6_forFilter$highThreshold = mRT_sub_Exp6_forFilter$m_RT + 3*mRT_sub_Exp6_forFilter$sd_RT
+
+Data_Exp6$validRT <- Data_Exp6$repWaitTime >= 0.2 & Data_Exp6$repWaitTime <= 2.5
+Data_Exp6_mRT <- Data_Exp6 %>% filter(validRT == TRUE)
+
+mRT_sub_Exp6 <-  dplyr::group_by(Data_Exp6_mRT, curDur, Exp, NSub, WMSize) %>%
+  dplyr::summarize(n = n(), m_RT = mean(repWaitTime))
+mRT_Exp6 <- mRT_sub_Exp6 %>% dplyr::group_by(Exp, curDur, WMSize) %>% 
+  dplyr::summarize(n = n(), m_mRT = mean(m_RT), sd_mRT = sd(m_RT)/sqrt(n-1))
+
 
 ```
 
@@ -308,18 +326,57 @@ plt_RprBias_Exp6 <- ggplot(data = mRpr_Exp6,
                                ymax = m_bias + sd_bias,
                                group=interaction(WMSize, Exp),
                                color=as.factor(WMSize), shape = as.factor(WMSize))) +
-  geom_line(aes(color = WMSize, linetype = Exp), stat = "identity",
+  geom_line(aes(color = WMSize), stat = "identity",
             position = position_dodge(width = 0.2)) +
   geom_hline(yintercept = 0, linetype='dashed') +
   geom_point(size = 2, stat = "identity",position = position_dodge(width = 0.2))+
   geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
-  coord_cartesian(ylim = c(-0.5, 0.4)) +
+  facet_wrap("Exp") +
+  coord_cartesian(ylim = c(-0.35, 0.2)) +
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
-  labs(x="Durations (s)", y="Reproduction bias (s)", 
-       shape ="Memory Load", color = "Memory Load", linetype = "Exp") +
-  theme_new + colorSet3 + guides(linetype = FALSE) + 
-  theme(legend.position = "top", legend.justification = c(.9, .9),
-        legend.text = element_text(size = 8), legend.title = element_text(size = 8, face = "bold"))
+  labs(x="", y="Reproduction bias (s)", 
+       shape ="Memory Load", color = "Memory Load") +
+  theme_new + colorSet3 + 
+  theme(legend.position = "top", legend.justification = c("center", "top"),
+        legend.text = element_text(size = 10), legend.title = element_text(size = 10, face = "bold"),
+        strip.text = element_text(size=10, face = "bold"))
+
+# Exp 6: response speed (from the onset of Reproduction cue to Reproduction onset)
+plt_RT_Exp6 <- ggplot(data = mRT_Exp6,
+                           aes(curDur, m_mRT, ymin = m_mRT - sd_mRT, 
+                               ymax = m_mRT + sd_mRT,
+                               group=interaction(WMSize, Exp),
+                               color=as.factor(WMSize), shape = as.factor(WMSize))) +
+  geom_line(aes(color = WMSize), stat = "identity",
+            position = position_dodge(width = 0.2)) +
+  geom_point(size = 2, stat = "identity",position = position_dodge(width = 0.2))+
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  facet_wrap("Exp") +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  labs(x="Duration (s)", y="Reaction Time (s)", 
+       shape ="Memory Load", color = "Memory Load") +
+  theme_new + colorSet3 + 
+  theme(legend.position = "top", legend.justification = c("center", "top"),
+        legend.text = element_text(size = 8), legend.title = element_text(size = 8, face = "bold"),
+        strip.text = element_text(size=10, face = "bold"))
+
+# Exp 6: response speed (from the onset of Reproduction cue to Reproduction onset) for each participant
+# plt_RT_Exp6Sub <- ggplot(data = mRT_sub_Exp6,
+#                            aes(x=curDur, y=m_RT, group=interaction(WMSize, Exp),
+#                                color=as.factor(WMSize), shape = as.factor(WMSize))) +
+#   geom_line(aes(color = WMSize, linetype = Exp), stat = "identity",
+#             position = position_dodge(width = 0.2)) +
+#   geom_point(size = 2, stat = "identity",position = position_dodge(width = 0.2))+
+#   facet_wrap("NSub") +
+#   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+#   labs(x="Duration (s)", y="Reaction Time (s)", 
+#        shape ="Memory Load", color = "Memory Load", linetype = "Exp") +
+#   theme_new + colorSet3 + 
+#   theme(legend.position = "top", legend.justification = c("center", "top"),
+#         legend.text = element_text(size = 8), legend.title = element_text(size = 10, face = "bold"),
+#         strip.text = element_text(size=10, face = "bold"))
+# plt_RT_Exp6Sub
+
 
 plt_RprBias_Exp1
 plt_RprBias_Exp2
@@ -327,6 +384,7 @@ plt_RprBias_Exp3
 plt_RprBias_Exp4
 plt_RprBias_Exp5
 plt_RprBias_Exp6
+plt_RT_Exp6
 ```
 
 ```{r}
@@ -424,47 +482,9 @@ plt_RprCV_Exp6 <- ggplot(data  = mRpr_Exp6,
   coord_cartesian(ylim = c(0.15, 0.35)) +
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
   labs(x="Durations (s)", y="CV (s)", 
-       color = "Memory Load", shape ="Memory Load", linetype = "Exp")+ 
-  theme_new + colorSet3 + theme(strip.text = element_text(size=10, face = "bold")) +
+       color = "Memory Load", shape ="Memory Load") +
+  theme_new + colorSet3 + theme(strip.text = element_text(size=0, face = "bold")) +
   guides(color = FALSE, shape = FALSE)
-
-
-# for each participant
-# plt_RprCV_Exp6Sub <- ggplot(data = mRpr_sub_Exp6,
-#                          aes(x = curDur, y = cv, group = interaction(WMSize,Exp),
-#                                color=as.factor(WMSize), shape=as.factor(WMSize))) +
-#   geom_line(aes(linetype = Exp), stat = "identity",position = position_dodge(width = 0.2)) +
-#   geom_point(size=3, stat = "identity", position = position_dodge(width = 0.2))+
-#   facet_wrap("NSub") +
-#   #coord_cartesian(ylim = c(0.15, 0.45)) +
-#   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
-#   labs(x="Durations (s)", y="CV (s)",
-#        color = "Memory Load", shape ="Memory Load", linetype = "Gap")+
-#   theme_new + colorSet3 + guides(color = FALSE, shape = FALSE, linetype = FALSE)
-# plt_RprCV_Exp6Sub
-
-
-# Exp 6: grand Reproduction CV across Memory loads
-# m_grdY_btwExp6 <- mRpr_sub_Exp6 %>% dplyr::group_by(Exp, curDur) %>%
-#   dplyr::summarize(n = n(),
-#                    m_m_repDur = mean(m_repDur),
-#                    m_bias = mean(m_repDur-curDur),
-#                    sd_bias = sd(m_repDur-curDur)/sqrt(n-1),
-#                    m_cv= mean(cv),
-#                    sd_cv=sd(cv)/sqrt(n-1))
-# 
-# plt_RprCV_btwExp6 <- ggplot(data=m_grdY_btwExp6,
-#                            aes(curDur, m_cv, ymin = m_cv - sd_cv,
-#                                ymax = m_cv + sd_cv, group=Exp)) +
-#   geom_line(aes(linetype = Exp), stat = "identity",
-#             position = position_dodge(width = 0.2)) +
-#   geom_point(size=3, stat = "identity", position = position_dodge(width = 0.2))+
-#   geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
-#   coord_cartesian(ylim = c(0.15, 0.35)) +
-#   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
-#   labs(x="Durations (s)", y="CV (s)", linetype = "Exp")+
-#   theme_new + colorSet3 + guides(linetype = FALSE)
-# plt_RprCV_btwExp6
 
 plt_RprCV_Exp1
 plt_RprCV_Exp2
@@ -499,8 +519,11 @@ plt_Exp5 <- ggarrange(plt_WMCrr_Exp5, plt_RprBias_Exp5, plt_RprCV_Exp5, common.l
                       ncol=3, nrow=1, widths = c(4,4,4), labels = c("a", "b","c"))
 plt_Exp5
 
-plt_Exp6 <- ggarrange(ggarrange(plt_WMCrr_Exp6, plt_RprBias_Exp6, ncol=2, widths=c(8,9), labels=c("a", "b")), 
-                      ggarrange(plt_RprCV_Exp6, labels = "c"), nrow = 2, heights = c(9,8))
+plt_Exp6_1 <- ggarrange(plt_WMCrr_Exp6, plt_RT_Exp6, common.legend = FALSE, 
+                      ncol=2, nrow=1, widths = c(3,6), labels = c("a", "b"))
+plt_Exp6_1
+
+plt_Exp6 <- ggarrange(plt_RprBias_Exp6, plt_RprCV_Exp6, labels=c("a", "b"), nrow = 2, heights = c(9,8))
 plt_Exp6
 
 ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp1.png"), plt_Exp1, width = 8.5, height = 3.54)
@@ -508,6 +531,8 @@ ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp2.png"), plt_Exp2, width = 8.5, 
 ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp3.png"), plt_Exp3, width = 8.5, height = 3.54)
 ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp4.png"), plt_Exp4, width = 8.5, height = 3.54)
 ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp5.png"), plt_Exp5, width = 8.5, height = 3.54)
+ggsave(paste0(getwd(), "/figures/plt_FigRvs2_WMCrr_Exp6.png"), plt_WMCrr_Exp6, width = 3, height = 3.54)
+ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp6_1.png"), plt_Exp6_1, width = 8.5, height = 3.54)
 ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp6.png"), plt_Exp6, width = 6, height = 6)
 ```
 
