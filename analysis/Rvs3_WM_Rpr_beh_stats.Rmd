@@ -1,0 +1,191 @@
+---
+title: "Analyses for MS_Revision of WM_Reproduction"
+author: "Jiao Wu"
+date: "2023-09-21"
+description: "adapted from behavioral_analysis.Rmd"
+output: html_document:
+    df_print: paged
+    number_sections: true
+  pdf_document: 
+    number_sections: true
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# load packages and functions {-}
+```{r include=FALSE}
+library(rlist)
+library(ez)
+library(tidyverse)
+library(latex2exp)
+library(lsr)
+library(rticles)
+library(DescTools)
+library(heplots)
+library(lme4)
+library(rstatix)
+library(boot)
+library(ggpubr)
+library(reshape2)
+library(MASS)
+library(lmerTest)
+library(sjPlot)
+```
+
+```{r}
+source('mytheme.R')
+# model version
+modelversion = 'gap_log_rstan'
+rstanmodelPath = 'modelrlt'
+modelPath = paste0(rstanmodelPath, '/models/', modelversion)
+```
+
+# omnibus analysis - Linear mixed model: Exp 2-5
+```{r}
+# data
+raw = read.csv(paste0("../data/AllValidData.csv"))
+# experiment as a factor
+raw$Exp = as.factor(raw$Exp)
+# set unique subject No. and as a factor, SubNo. 10#, 20#...
+raw$NSub = as.numeric(raw$Exp)*100 + raw$NSub
+
+mRep = raw %>% filter(repDur > 0.2, repDur < 4) %>%
+  group_by(Exp, NSub, WMSize, gap, curDur) %>% 
+  summarise(Rep = mean(repDur)) %>%
+  mutate(bias = Rep - curDur)
+
+mmRep = mRep%>% #within-subject average 
+  group_by(Exp, WMSize, gap, curDur) %>%
+  summarise(mBias = mean(bias), se = sd(bias)/sqrt(n()), n = n())
+mmRep$WMSize = as.factor(mmRep$WMSize)
+mmRep$gap = as.factor(mmRep$gap)
+
+ggplot(data = mmRep, aes(curDur, mBias, color = WMSize)) + 
+  geom_point() + geom_line() + 
+  geom_errorbar(aes(ymin = mBias - se, ymax = mBias + se), width = 0.1) +
+  facet_wrap(~Exp) + theme_minimal()
+
+ggplot(data = mmRep %>% filter(Exp == 'Exp5'), 
+       aes(curDur, mBias, linetype = gap, color = WMSize)) + 
+  geom_point() + geom_line() + 
+  geom_errorbar(aes(ymin = mBias - se, ymax = mBias + se), width = 0.1) +
+  facet_wrap(~Exp) + theme_minimal()
+
+```
+
+```{r}
+lm(Rep ~ Exp*curDur*WMSize,
+            data = mRep %>% filter(Exp != 'Exp1') )
+```
+
+We are interested in the following comparisons:
+1. encoding vs. reproduction (Exp. 2 vs. Exp. 3)
+2. encoding vs. combination (Exp. 2 vs. Exp. 4)
+3. Gap effect (Exp. 4 vs. 5)
+
+Thus we construct the contrast matrix as follows:
+$$\begin{equation*}
+C = \begin{pmatrix}
+1 & -1 & 0 & 0 \\
+1 & 0 & -1 & 0 \\
+0 & 0 & 1 & -1
+\end{pmatrix}
+\end{equation*}$$
+
+```{r}
+# contrast among experiment. 
+# we want to compare 
+# 1. E2 vs E3 (encoding vs. reprod)
+# 2. E2 vs E4 (encoding vs. both phases)
+# 3. gap: E4 vs. E5
+
+mRep$memory = (mRep$WMSize-1)/2  # memory load 0, 1, 2
+mRep$cond = mRep$Exp #avoid confusion from output Exp --> Cond
+mRep$duration = mRep$curDur - 1.1 # centered to 1.1 (middle point)
+
+contr = rbind(c(1, -1, 0, 0), 
+             c(1, 0, -1, 0),
+             c(0, 0, 1, -1))
+cmat = ginv(contr)
+
+# Linear mixed model 
+mod1 = lmer(bias ~ cond*duration*memory + 
+              (duration * memory|NSub),  
+            contrasts = list(cond = cmat), 
+            data = mRep %>% filter(cond != 'Exp1'), REML = FALSE)
+summary(mod1)
+anova(mod1)
+tab_model(mod1, digits = 3)
+```
+
+# linear mixed model for the effect of holding period (gap) in Exp 5
+```{r}
+mod_Exp5 = lmer(bias ~ gap*duration*memory + 
+              (gap*duration*memory|NSub),  
+            data = mRep %>% filter(Exp == 'Exp5'), REML = FALSE)
+summary(mod_Exp5)
+anova(mod_Exp5)
+tab_model(mod_Exp5, digits = 3)
+```
+# omnibus analysis - linear mixed model: Exp 6a-c
+# 
+```{r}
+# data
+Data_Exp6 <- read.csv(paste0("../data/Exp6.csv")) %>% filter(valid == 1)
+Data_Exp6$Exp = as.factor(Data_Exp6$Exp)
+
+mRep_Exp6 = Data_Exp6 %>% filter(repDur > 0.2, repDur < 4) %>%
+  group_by(Exp, NSub, WMSize, curDur) %>% 
+  summarise(Rep = mean(repDur)) %>%
+  mutate(bias = Rep - curDur)
+
+mmRep_Exp6 = mRep_Exp6 %>% #within-subject average 
+  group_by(Exp, WMSize, curDur) %>%
+  summarise(mBias = mean(bias), se = sd(bias)/sqrt(n()), n = n())
+mmRep_Exp6$WMSize = as.factor(mmRep_Exp6$WMSize)
+
+ggplot(data = mmRep_Exp6, aes(curDur, mBias, color = WMSize)) + 
+  geom_point() + geom_line() + 
+  geom_errorbar(aes(ymin = mBias - se, ymax = mBias + se), width = 0.1) +
+  facet_wrap(~Exp) + theme_minimal()
+```
+
+We are interested in the following comparisons:
+1. loading on encoding vs. reproduction (Exp. 6a vs. 6b)
+2. loading on encoding vs. no load (exp. 6a vs. 6c)
+3. loading on reproduction vs. no load (exp. 6b vs. 6c)
+
+Thus we construct the contrast matrix as follows:
+
+$$\begin{equation*}
+C = \begin{pmatrix}
+1 & -1 & 0 \\
+1 & 0 & -1 \\
+0 & 1 & -1
+\end{pmatrix}
+\end{equation*}$$
+
+```{r lmm, message=FALSE, warning=FALSE}
+
+mRep_Exp6$memory = (mRep_Exp6$WMSize-1)/2  # memory load 0, 1, 2
+mRep_Exp6$cond = mRep_Exp6$Exp #avoid confusion from output Exp --> Cond
+mRep_Exp6$duration = mRep_Exp6$curDur - 1.1 # centered to 1.1 (middle point)
+
+contr_Exp6 = rbind(c(1, -1, 0), 
+             c(1, 0, -1),
+             c(0, 1, -1))
+cmat_Exp6 = ginv(contr_Exp6)
+
+# Linear mixed model 
+mod_Exp6 = lmer(bias ~ cond*duration*memory + 
+              (duration * memory|NSub),  
+            contrasts = list(cond = cmat_Exp6), 
+            data = mRep_Exp6, REML = FALSE)
+summary(mod_Exp6)
+anova(mod_Exp6)
+tab_model(mod_Exp6, digits = 3)
+```
+
