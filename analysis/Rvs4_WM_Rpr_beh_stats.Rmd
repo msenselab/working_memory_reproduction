@@ -819,7 +819,10 @@ plt_SlpIP_Exp6 <-
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
   theme_new + colorSet3 +
   labs(x="Durations (s)", y="Estimated Reproduction bias (s)", color = "Memory Load")+
-  theme(legend.position = "none")
+  theme(legend.position = "top", legend.justification = c(.8, .8),
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"))
+  #theme(legend.position = "none")
 
 
 plt_SlpIP_Exp1
@@ -870,6 +873,38 @@ plt_Exp6_2 <- ggarrange(plt_SlpIP_Exp6, labels=c("c"),
                       nrow = 1, heights = c(9))
 plt_Exp6_2
 
+##### linear-fitted plot only
+plt_Exp1 <- ggarrange(plt_WMCrr_Exp1, plt_SlpIP_Exp1, 
+                      common.legend = TRUE, labels = c("a", "b"), 
+                      ncol=2, nrow=1, widths = c(4,4))
+plt_Exp1
+
+plt_Exp2 <- ggarrange(plt_WMCrr_Exp2, plt_SlpIP_Exp2, 
+                      common.legend = TRUE, labels = c("a", "b"), 
+                      ncol=2, nrow=1, widths = c(4,4))
+plt_Exp2
+
+plt_Exp3 <- ggarrange(plt_WMCrr_Exp3, plt_SlpIP_Exp3, 
+                      common.legend = TRUE, labels = c("a", "b"), 
+                      ncol=2, nrow=1, widths = c(4,4))
+plt_Exp3
+
+plt_Exp4 <- ggarrange(plt_WMCrr_Exp4, plt_SlpIP_Exp4, 
+                      common.legend = TRUE, labels = c("a", "b"), 
+                      ncol=2, nrow=1, widths = c(4,4))
+plt_Exp4
+
+plt_Exp5 <- ggarrange(plt_WMCrr_Exp5, plt_SlpIP_Exp5, 
+                      common.legend = TRUE, labels = c("a", "b"), 
+                      ncol=2, nrow=1, widths = c(4,4))
+plt_Exp5
+
+plt_Exp6_3 <- ggarrange(plt_WMCrr_Exp6, plt_SlpIP_Exp6, common.legend = FALSE, 
+                      ncol=2, nrow=1, widths = c(3,6), labels = c("a", "b"))
+plt_Exp6_3
+
+
+
 # save the plots to .png files
 ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp1.png"), 
        plt_Exp1, width = 8.5, height = 3.54)
@@ -881,6 +916,10 @@ ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp4.png"),
        plt_Exp4, width = 8.5, height = 3.54)
 ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp5.png"), 
        plt_Exp5, width = 8.5, height = 3.54)
+ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp6_3.png"), 
+       plt_Exp6_3, width = 8.5, height = 3.54)
+
+
 ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp6_1.png"), 
        plt_Exp6_1, width = 8.5, height = 3.54)
 ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp6_2.png"), 
