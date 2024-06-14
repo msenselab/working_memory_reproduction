@@ -90,7 +90,8 @@ AllExpData$Exp = as.factor(AllExpData$Exp)
 # Exp 1-4 (factors: Duration, WM load)
 mRpr_sub <- dplyr::group_by(AllExpData, curDur, Exp, NSub, WMSize) %>%
   dplyr::summarize(n = n(), m_repDur = mean(repDur), sd_repDur = sd(repDur),
-                   cv = sd_repDur/ m_repDur)
+                   cv = sd_repDur/ m_repDur, mBias = mean(repDur-curDur),
+                   sdBias = sd(repDur-curDur))
 mRpr <- mRpr_sub %>% dplyr::group_by(Exp, curDur, WMSize) %>% 
   dplyr::summarize(n = n(), m_m_repDur = mean(m_repDur),
                    m_bias = mean(m_repDur-curDur), 
@@ -477,10 +478,10 @@ plt_RprBias_Exp3 <- ggplot(data = mRpr %>% filter(Exp == 'Exp. 3'),
                                color=as.factor(WMSize), 
                                shape = as.factor(WMSize))) +
   geom_line(aes(color = WMSize), 
-            stat = "identity", position = position_dodge(width = 0.2)) +
+            stat = "identity", position = position_dodge(width = 0)) +
   geom_hline(yintercept = 0, linetype='dashed') +
-  geom_point(size = 2, stat="identity", position=position_dodge(width=0.2)) +
-  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  geom_point(size = 2, stat="identity", position=position_dodge(width=0)) +
+  geom_errorbar(width=.2,  position = position_dodge(width = 0)) +
   coord_cartesian(ylim = c(-0.5, 0.4)) +
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
   labs(x="Durations (s)", y="Reproduction bias (s)", 
@@ -489,6 +490,27 @@ plt_RprBias_Exp3 <- ggplot(data = mRpr %>% filter(Exp == 'Exp. 3'),
   theme(legend.position = "top", legend.justification = c(.8, .8),
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 10, face = "bold"))
+
+# plot data for each participants
+plt_RprBias_Exp3_par <- ggplot(data = mRpr_sub %>% filter(Exp == 'Exp. 3'),
+                           aes(curDur, mBias, ymin = mBias - sdBias,
+                               ymax = mBias + sdBias, group = WMSize,
+                               color=as.factor(WMSize), 
+                               shape = as.factor(WMSize))) +
+  geom_line(aes(color = WMSize), 
+            stat = "identity", position = position_dodge(width = 0.2)) +
+  geom_hline(yintercept = 0, linetype='dashed') +
+  geom_point(size = 2, stat="identity", position=position_dodge(width=0.2)) +
+  geom_errorbar(width=.2,  position = position_dodge(width = 0.2)) +
+  facet_wrap("NSub") +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  labs(x="Durations (s)", y="Reproduction bias (s)", 
+       shape ="Memory Load", color = "Memory Load")+
+  theme_new + colorSet3 +
+  theme(legend.position = "top", legend.justification = c(.8, .8),
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"))
+plt_RprBias_Exp3_par
 
 # Exp 4
 plt_RprBias_Exp4 <- ggplot(data = mRpr %>% filter(Exp == 'Exp. 4'),
@@ -509,7 +531,7 @@ plt_RprBias_Exp4 <- ggplot(data = mRpr %>% filter(Exp == 'Exp. 4'),
   theme(legend.position = "top", legend.justification = c(.8, .8),
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 10, face = "bold"))
-plt_RprBias_Exp4
+
 # Exp 5
 plt_RprBias_Exp5 <- ggplot(data = mRpr_Exp5,
                            aes(curDur, m_bias, ymin = m_bias - se_bias, 
@@ -556,7 +578,6 @@ plt_RprBias_Exp6 <- ggplot(data = mRpr_Exp6,
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 10, face = "bold"),
         strip.text = element_text(size=10, face = "bold"))
-plt_RprBias_Exp6
 
 # Exp 6: Reaction Time (from the Reproduction cue onset to Reproduction onset)
 plt_RT_Exp6 <- ggplot(data = mRT_Exp6,
@@ -769,5 +790,8 @@ ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp6_1.png"),
        plt_Exp6_1, width = 8.5, height = 3.54)
 ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp6.png"), 
        plt_Exp6_2, width = 6, height = 6)
+
+ggsave(paste0(getwd(), "/figures/plt_FigRvs2_Exp3_noPosDg.png"), 
+       plt_Exp3, width = 8.5, height = 3.54)
 ```
 

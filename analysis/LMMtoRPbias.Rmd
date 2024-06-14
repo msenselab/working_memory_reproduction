@@ -1,0 +1,268 @@
+---
+title: "linear mixed model to the reproduced biases"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  pdf_document: default
+  
+---
+
+The raw data are stored in the subfolder `data`. Let's read in. 
+
+```{r readdata, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(MASS)
+library(lme4)
+library(lmerTest)
+library(sjPlot)
+raw = read.csv('../data/AllValidData.csv')  %>% filter(valid == 1)%>% filter(repDur > 0.2)
+# raw$RP_bias = raw$repDur - raw$curDur
+# raw = raw%>% filter(RP_bias < 1)  
+# experiment as a factor
+raw$Exp = as.factor(raw$Exp)
+# set unique subject No. and as a factor, SubNo. 10#, 20#...
+raw$NSub = as.numeric(raw$Exp)*100 + raw$NSub
+
+head(raw)
+```
+
+## Visualize the mean reproduction biases. 
+
+```{r meanplot, message=FALSE, warning=FALSE}
+mRep = raw %>% filter(repDur > 0.2, repDur < 4) %>%
+  group_by(Exp, NSub, WMSize, gap, curDur) %>% 
+  summarise(Rep = mean(repDur)) %>%
+  mutate(bias = Rep - curDur)
+
+mmRep = mRep%>% #within-subject average 
+  group_by(Exp, WMSize, gap, curDur) %>%
+  summarise(mRep = mean(Rep), mBias = mean(bias), se = sd(bias)/sqrt(n()), n = n())
+mmRep$WMSize = as.factor(mmRep$WMSize)
+
+mmRep$gap = as.factor(mmRep$gap)
+# visualize the biases
+ggplot(data = mmRep %>% filter(Exp == 'Exp5'), aes(curDur, mBias, linetype = gap, color = WMSize)) + 
+  geom_point() + geom_line() + 
+  geom_errorbar(aes(ymin = mBias - se, ymax = mBias + se), width = 0.1) +
+  facet_wrap(~Exp) + theme_minimal()
+```
+
+Preliminary investigation using standard linear model to get first impression. 
+
+```{r message=FALSE, warning=FALSE}
+lm(Rep ~ Exp*curDur*WMSize,
+            data = mRep %>% filter(Exp != 'Exp1') )
+```
+## Between-Experiment Comparisons (Experiments 2-5)
+
+It seems that working memory impacts on the central tendency, as the interaction term WMSize x Duration varied across experiments. 
+
+
+
+To make a formal analysis, we use linear mixed model. Given that Experiment 1 was a baseline checking the duration reproduction was not impacted by the sequential presentation, we leave this experiment out for cross-experiment analysis. 
+
+Given that we are interested how memory manipulation influence duration reproduction on the encoding and reproduction stages, the cross-experiment analysis mainly focuses on the manipulation stage. 
+
+Here are the experimental design:
+
+Exp. 2: Memory load on the encoding stage 
+Exp. 3: Memory load on the reproduction stage
+Exp. 4: Memory load on both stages
+Exp. 5: Memory load on both stage + additional 2 sec gap. 
+
+We are interested the following comparisons:
+1. encoding vs. reproduction (Exp. 2 vs. Exp. 3)
+2. individual impact vs. combination (exp. 2 + exp. 3 vs. Exp. 4)
+3. Gap effect (Exp. 4 vs. 5 )
+
+Thus we construct the contrast matrix as follows:
+
+$$\begin{equation*}
+C = \begin{pmatrix}
+1 & -1 & 0 & 0 \\
+1 & 0 & -1 & 0 \\
+0 & 0 & 1 & -1
+\end{pmatrix}
+\end{equation*}
+$$
+In addition, we assume in each experiment, the slope and intercept of the reproduction could be covaried across different memory loads for individuals. 
+
+```{r lmm, message=FALSE, warning=FALSE}
+# contrast among experiment. 
+# we want to compare 
+# 1. E2 vs E3 (encoding vs. reprod)
+# 2. combination of two phases vs. spanning: E2 + E3 vs. E4
+# 3. gap: E4 vs. E5
+
+mRep$memory = (mRep$WMSize-1)/2  # memory load 0, 1, 2
+mRep$cond = mRep$Exp #avoid confusion from output Exp --> Cond
+mRep$duration = mRep$curDur - 1.1 # centered to 1.1 (middle point)
+
+contr = rbind(c(1, -1, 0, 0), 
+             c(1, 0, -1, 0),
+             c(0, 0, 1, -1))
+cmat = ginv(contr)
+
+# Linear mixed model 
+mod1 = lmer(bias ~ cond*duration*memory + 
+              (duration * memory|NSub),  
+            contrasts = list(cond = cmat), 
+            data = mRep %>% filter(cond != 'Exp1'), REML = FALSE)
+summary(mod1)
+anova(mod1)
+tab_model(mod1, digits = 3)
+```
+
+
+
+
+## Interpretation of the results__
+
+* The overall central tendency across all experiments was significant.
+The mean central tendency index was 0.45. 
+
+* The main effect of Memory Load was also significant. Increase memory load one level elevated the bias for  22 ms. (Overestimation)
+
+* There was no significant difference of mean central tendency effect for those comparisons we were interested in (the above three comparison). 
+
+* Memory load, however, impacted differently. There was different impact of memory between Exp. 2 and 3., Exp2 + Exp 3 vs. Exp. 4. But there was no much difference between Exp 4 and 5.
+
+* There was a strong interaction between memory and duration (central tendency). Increase one memory load level, the central tendency would increase 2.6% on average. 
+
+* The impact of memory on central tendency significantly differ among three contrasts (comparisons). 
+      1. Difference between Exp 2 vs. 3. 
+      2. Exp. 4 differred from the combination of Exp. 2 and 3. (i.e., no complete cancel each other on the central tendency when memory load was imposed on both stages)
+      3. Adding a gap inbetween increased 3.3% central tendency. 
+      
+      
+### LMM for Exp. 5
+
+```{r}
+mod5 = lmer(bias ~ gap*duration*memory + 
+              (gap*duration*memory|NSub),  
+            data = mRep %>% filter(Exp == 'Exp5'), REML = FALSE)
+summary(mod5)
+anova(mod5)
+tab_model(mod5, digits = 3)
+```
+
+
+# Within-Experiment Comparisons (Experiments 6a, 6b and 6c)
+
+```{r}
+#load data in Experiment 6 
+dat_Exp6 = read.csv(paste0("../data/AllValidDat_Exp6.csv")) %>%filter(valid == 1)%>% filter(repDur > 0.2)
+# dat_Exp6$RP_bias = dat_Exp6$repDur - dat_Exp6$curDur
+# dat_Exp6 = dat_Exp6%>% filter(RP_bias < 1)  
+
+# experiment as a factor
+dat_Exp6$Exp = as.factor(dat_Exp6$Exp)
+# set unique subject No. and as a factor, SubNo. 10#, 20#...
+dat_Exp6$NSub = as.numeric(dat_Exp6$Exp)*100 + dat_Exp6$NSub
+
+head(dat_Exp6)
+```
+
+
+In addition, we assume in each experiment, the slope and intercept of the reproduction could be covaried across different memory loads for individuals. 
+
+
+We are interested the following comparisons:
+H1. encoding vs. reproduction (Exp. 6a vs. Exp. 6b)
+H2. reproduction vs. control (Exp. 6b vs. Exp. 6c)
+
+Thus we construct the contrast matrix as follows:
+$$\begin{equation*}
+C = \begin{pmatrix}
+1 & -1 & 0  \\
+0 & 1 & -1
+\end{pmatrix}
+\end{equation*}
+$$
+
+
+```{r lmm6, message=FALSE, warning=FALSE}
+mRep_Exp6 = dat_Exp6  %>%
+  group_by(Exp, NSub, WMSize, curDur) %>% 
+  summarise(Rep = mean(repDur)) %>%
+  mutate(bias = Rep - curDur)
+
+mRep_Exp6$memory = (mRep_Exp6$WMSize-1)/2 # memory load 0, 1, 2 
+mRep_Exp6$cond = mRep_Exp6$Exp 
+mRep_Exp6$duration = mRep_Exp6$curDur - 1.1 # centered to 1.1 (middle point)
+#levels(mRep_Exp6$cond) = c("Exp6c", "Exp6a","Exp6b") 
+```
+
+
+
+
+```{r}
+contr_exp6 = rbind(c(1, -1, 0),
+                   c(0, 1, -1))
+cmat_exp6 = ginv(contr_exp6)
+# Linear mixed model 
+mod_exp6 = lmer(bias ~ cond*duration*memory + 
+              (duration * memory|NSub),  
+            contrasts = list(cond = cmat_exp6), 
+            data = mRep_Exp6, REML = F)
+summary(mod_exp6)
+anova(mod_exp6)
+tab_model(mod_exp6, digits = 3)
+```
+
+
+
+
+We are interested the following comparisons:
+H1. encoding vs. reproduction (Exp. 6a vs. Exp. 6b)
+H2. reproduction vs. control (Exp. 6a vs. Exp. 6c)
+
+Thus we construct the contrast matrix as follows:
+$$\begin{equation*}
+C = \begin{pmatrix}
+1 & -1 & 0  \\
+1 &  0 & -1
+\end{pmatrix}
+\end{equation*}
+$$
+
+```{r}
+contr_exp6 = rbind(c(1, -1, 0),
+                   c(1, 0, -1))
+cmat_exp6 = ginv(contr_exp6)
+# Linear mixed model 
+mod_exp6 = lmer(bias ~ cond*duration*memory + 
+              (duration * memory|NSub),  
+            contrasts = list(cond = cmat_exp6), 
+            data = mRep_Exp6, REML = F)
+summary(mod_exp6)
+anova(mod_exp6)
+tab_model(mod_exp6, digits = 3)
+```
+
+H1. encoding vs. reproduction (Exp. 6a vs. Exp. 6b)
+H2. encoding and reproduction vs. control (Exp. 6a and Exp. 6b vs. Exp. 6c)
+
+Thus we construct the contrast matrix as follows:
+$$\begin{equation*}
+C = \begin{pmatrix}
+1 & -1 & 0  \\
+0.5 &  0.5 & -1
+\end{pmatrix}
+\end{equation*}
+$$
+
+```{r}
+contr_exp6 = rbind(c(1, -1, 0),
+                   c(1/2, 1/2, -1))
+cmat_exp6 = ginv(contr_exp6)
+# Linear mixed model 
+mod_exp6 = lmer(bias ~ cond*duration*memory + 
+              (duration * memory|NSub),  
+            contrasts = list(cond = cmat_exp6), 
+            data = mRep_Exp6, REML = F)
+summary(mod_exp6)
+anova(mod_exp6)
+tab_model(mod_exp6, digits = 3)
+```
