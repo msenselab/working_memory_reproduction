@@ -186,7 +186,7 @@ plt_bar_WMCrr_Exp2 <- ggplot(WMCrrForExp2,aes(x=gap, y=mean_WMCrr,
               xmin = c(0.6, 1, 1.6, 2), xmax = c(1, 1.4, 2, 2.4),
               color = 'black') +
   labs(x="Gap", y="Mean accuracy", fill="Memory Load", title="Memory test") +
-  theme_new + fillSet3 + theme(plot.title = element_text(hjust = 0.5))
+  theme_new + fillGreySet3 + theme(plot.title = element_text(hjust = 0.5))
 plt_bar_WMCrr_Exp2
 
 # plt_bar_WMCrr_Exp2 <- ggplot(WMCrrForExp2,aes(x=WMSize, y=mean_WMCrr, 
@@ -267,7 +267,7 @@ plt_bar_WMCrr_Exp6 <- ggplot(WMCrrForExp6,aes(x=Exp, y=mean_WMCrr,
               xmin = c(0.7, 1, 1.7, 2, 2.7, 3), xmax = c(1, 1.3, 2, 2.3, 3, 3.3),
               color = 'black') +
   labs(x="Experiment", y="Mean accuracy", fill="Memory Load", title="Memory test") + 
-  theme_new + fillSet3 + theme(plot.title = element_text(hjust = 0.5))
+  theme_new + fillGreySet3 + theme(plot.title = element_text(hjust = 0.5))
 plt_bar_WMCrr_Exp6
 
 # plt_bar_WMCrr_Exp6 <- ggplot(WMCrrForExp6,aes(x=WMSize, y=mean_WMCrr, 
@@ -349,7 +349,7 @@ mRpr_Exp5 <- mRpr_Exp5_sub %>% dplyr::group_by(curDur, WMSize) %>%
                    se_bias = sd(m_repDur-curDur)/sqrt(n-1),
                    m_cv= mean(cv), se_cv=sd(cv)/sqrt(n-1))
 
-# Exp 2 (factors: Duration, WM load, Gap)
+# Exp 2 (factors: Duration, WM load, gap)
 Data_Exp2$gap <- factor(Data_Exp2$gap, labels = c("short", "long")) # mark Gap
 
 mRpr_Exp2_sub <- dplyr::group_by(Data_Exp2, curDur, NSub, WMSize, gap) %>%
@@ -360,6 +360,7 @@ mRpr_Exp2 <- mRpr_Exp2_sub %>% dplyr::group_by(curDur, WMSize, gap) %>%
                    m_bias = mean(m_repDur-curDur), 
                    se_bias = sd(m_repDur-curDur)/sqrt(n-1),
                    m_cv= mean(cv), se_cv=sd(cv)/sqrt(n-1))
+mRpr_Exp2$Gap = factor(mRpr_Exp2$gap, labels=c("short gap","long gap"))
 
 # Exp 6 (factors: Duration, WM load, Exp)
 mRpr_Exp6_sub <-  dplyr::group_by(Data_Exp6, curDur, Exp, NSub, WMSize) %>%
@@ -384,15 +385,15 @@ plt_RprBias_Exp1 <- ggplot(data = mRpr_Exp1,
                                color=as.factor(WMSize), 
                                shape = as.factor(WMSize))) +
   geom_line(aes(color = WMSize), 
-            stat = "identity",position = position_dodge(width = jt)) +
+            stat = "identity",position = position_dodge(width = jt)) + 
   geom_hline(yintercept = 0, linetype='dashed') +
   geom_point(size = 2, stat="identity", position=position_dodge(width=jt)) +
   geom_errorbar(width=.2,  position = position_dodge(width = jt)) +
   coord_cartesian(ylim = c(-0.5, 0.4)) +
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
   labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
-       shape ="Memory Load", color = "Memory Load")+
-  theme_new + colorSet3 +
+       shape ="Memory Load", color = "Memory Load") +
+  theme_new + greySet3 +
   theme(legend.position = c(.7,.8), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 10, face = "bold"),
@@ -400,7 +401,6 @@ plt_RprBias_Exp1 <- ggplot(data = mRpr_Exp1,
 
 
 # Exp 2
-# mRpr_Exp2$Gap = factor(mRpr_Exp2$gap, labels=c("short gap","long gap"))
 plt_RprBias_Exp2 <- ggplot(data = mRpr_Exp2,
                            aes(curDur, m_bias, ymin = m_bias - se_bias, 
                                ymax = m_bias + se_bias, 
@@ -416,7 +416,7 @@ plt_RprBias_Exp2 <- ggplot(data = mRpr_Exp2,
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
   labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
        shape ="Memory Load", color = "Memory Load") +
-  theme_new + colorSet3 + 
+  theme_new + greySet3 + 
   theme(legend.position = c(.8,.8), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 10, face = "bold"),
@@ -438,7 +438,7 @@ plt_RprBias_Exp3 <- ggplot(data = mRpr_Exp3,
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
   labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
        shape ="Memory Load", color = "Memory Load")+
-  theme_new + colorSet3 +
+  theme_new + greySet3 +
   theme(legend.position = c(.7,.8), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 10, face = "bold"),
@@ -460,7 +460,7 @@ plt_RprBias_Exp4 <- ggplot(data = mRpr_Exp4,
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
   labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
        shape ="Memory Load", color = "Memory Load")+
-  theme_new + colorSet3 +
+  theme_new + greySet3 +
   theme(legend.position = c(.7,.8), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 10, face = "bold"),
@@ -482,7 +482,7 @@ plt_RprBias_Exp5 <- ggplot(data = mRpr_Exp5,
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
   labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
        shape ="Memory Load", color = "Memory Load")+
-  theme_new + colorSet3 +
+  theme_new + greySet3 +
   theme(legend.position = c(.7,.8), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 10, face = "bold"),
@@ -505,7 +505,7 @@ plt_RprBias_Exp6 <- ggplot(data = mRpr_Exp6,
   scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
   labs(x="", y="Reproduction bias (s)", title="Duration Reproduction",
        shape ="Memory Load", color = "Memory Load") + 
-  theme_new + colorSet3 + 
+  theme_new + greySet3 + 
   theme(legend.position = c(.9,.8), 
         legend.text = element_text(size = 10), 
         legend.title = element_text(size = 10, face = "bold"),
@@ -691,7 +691,7 @@ plt_SlpIP_Exp1 <- ggplot(data = tb_SlpIP_Exp1_sub %>% group_by(WMSize)%>%
   geom_errorbar(width = 0.02, aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP)) +
   geom_errorbarh(height =0.02, aes(xmin = m_slope - se_slope, xmax = m_slope + se_slope)) +
   theme_new+
-  labs(colour = "Memory Load")+colorSet3+
+  labs(colour = "Memory Load") + greySet3 +
   xlab('slope of reproduction bias')+ylab("indifference point (ms)")+guides(shape="none")+
   theme(legend.position = "top")
 plt_SlpIP_Exp1
@@ -767,7 +767,7 @@ plt_bar_SlpIP_Exp1 <- ggplot(tb_SlpIP_Exp1, aes(x=WMSize,y=m_slope)) +
               color = 'black') +
   coord_cartesian(ylim = c(-0.7, 0)) +
   labs(x="Memory Load", y="Estimated slope", title="Reproduction bias slope") + 
-  theme_new + theme(legend.position = "top", legend.justification = c("center", "top"),
+  theme_new + theme(legend.position = "bottom", legend.justification = c("center", "top"),
                     plot.title = element_text(hjust = 0.5))
 plt_bar_SlpIP_Exp1
 
@@ -777,17 +777,17 @@ plt_bar_SlpIP_Exp2 <- ggplot(tb_SlpIP_Exp2, aes(x=gap,y=m_slope,
   geom_bar(stat="identity", aes(fill=WMSize), position=position_dodge()) +
   geom_errorbar(aes(x=gap, ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
                 width=.1,  position = position_dodge(.9)) +
-  geom_signif(annotations=c("n.s.","n.s.","n.s.","*","n.s.","**"), 
+  geom_signif(annotations=c("*","**"), 
               tip_length = -0.1, vjust=2.5,
-              y_position = c(-0.55, -0.58, -0.7, -0.6, -0.63, -0.75), 
-              xmin = c(0.7, 1.05, 0.7, 1.7, 2.05, 1.7), 
-              xmax = c(0.95, 1.3, 1.3, 1.95, 2.3, 2.3),
+              y_position = c(-0.6, -0.7), 
+              xmin = c(1.7, 1.7), 
+              xmax = c(1.95, 2.3),
               color = 'black') +
   coord_cartesian(ylim = c(-0.85, 0)) +
   labs(x="Gap", y="Estimated slope", fill="Memory Load", 
        title="Reproduction bias slope") + 
-  theme_new + fillSet3 + 
-  theme(legend.position = "none",
+  theme_new + fillGreySet3 + 
+  theme(legend.position = "bottom",
         plot.title = element_text(hjust = 0.5))
 plt_bar_SlpIP_Exp2
 
@@ -796,12 +796,12 @@ plt_bar_SlpIP_Exp3 <- ggplot(tb_SlpIP_Exp3, aes(x=WMSize,y=m_slope)) +
   geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
   geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
                 width=.1,  position = position_dodge()) +
-  geom_signif(annotations=c("***","n.s."), tip_length = -0.1, vjust=2.5,
-              y_position = c(-0.73,-0.78), xmin = c(1, 2.1), xmax = c(1.9, 3),
+  geom_signif(annotations=c("***"), tip_length = -0.1, vjust=2.5,
+              y_position = c(-0.73), xmin = c(1), xmax = c(1.9),
               color = 'black') +
   coord_cartesian(ylim = c(-0.85, 0)) +
   labs(x="Memory Load", y="Estimated slope", title="Reproduction bias slope") + 
-  theme_new + theme(legend.position = "top", legend.justification = c("center", "top"),
+  theme_new + theme(legend.position = "bottom", legend.justification = c("center", "top"),
                     plot.title = element_text(hjust = 0.5))
 plt_bar_SlpIP_Exp3
 
@@ -810,12 +810,9 @@ plt_bar_SlpIP_Exp4 <- ggplot(tb_SlpIP_Exp4, aes(x=WMSize,y=m_slope)) +
   geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
   geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
                 width=.1,  position = position_dodge()) +
-  geom_signif(annotations=c("n.s.","n.s."), tip_length = -0.1, vjust=2.5,
-              y_position = c(-0.65,-0.65), xmin = c(1, 2.1), xmax = c(1.9, 3),
-              color = 'black') +
   coord_cartesian(ylim = c(-0.75, 0)) +
   labs(x="Memory Load", y="Estimated slope", title="Reproduction bias slope") + 
-  theme_new + theme(legend.position = "top", legend.justification = c("center", "top"),
+  theme_new + theme(legend.position = "bottom", legend.justification = c("center", "top"),
                     plot.title = element_text(hjust = 0.5))
 plt_bar_SlpIP_Exp4
 
@@ -824,12 +821,9 @@ plt_bar_SlpIP_Exp5 <- ggplot(tb_SlpIP_Exp5, aes(x=WMSize,y=m_slope)) +
   geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
   geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
                 width=.1,  position = position_dodge()) +
-  geom_signif(annotations=c("n.s.","n.s."), tip_length = -0.1, vjust=2.5,
-              y_position = c(-0.58,-0.58), xmin = c(1, 2.1), xmax = c(1.9, 3),
-              color = 'black') +
   coord_cartesian(ylim = c(-0.65, 0)) +
   labs(x="Memory Load", y="Estimated slope", title="Reproduction bias slope") + 
-  theme_new + theme(legend.position = "top", legend.justification = c("center", "top"),
+  theme_new + theme(legend.position = "bottom", legend.justification = c("center", "top"),
                     plot.title = element_text(hjust = 0.5))
 plt_bar_SlpIP_Exp5
 
@@ -839,17 +833,17 @@ plt_bar_SlpIP_Exp6 <- ggplot(tb_SlpIP_Exp6, aes(x=exp,y=m_slope,
   geom_bar(stat="identity", aes(fill=WMSize), position=position_dodge()) +
   geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
                 width=.1,  position = position_dodge(.9)) +
-  geom_signif(annotations=c("**","n.s.","***","n.s.","n.s.","n.s.","n.s."),
+  geom_signif(annotations=c("**","***"),
               tip_length = -0.1, vjust=2.5,
-              y_position = c(-0.48, -0.52, -0.62, -0.44, -0.44, -0.4, -0.4),
-              xmin = c(0.7, 1.05, 0.7, 1.7, 2.05, 2.7, 3.05),
-              xmax = c(0.95, 1.3, 1.3, 1.95, 2.3, 2.95, 3.3),
+              y_position = c(-0.48, -0.56),
+              xmin = c(0.7, 0.7),
+              xmax = c(0.95, 1.3),
               color = 'black') +
-  coord_cartesian(ylim = c(-0.7, 0)) +
+  coord_cartesian(ylim = c(-0.65, 0)) +
   labs(x="Experiment", y="Estimated slope", fill="Memory Load", 
        title="Reproduction bias slope") + 
-  theme_new + fillSet3 + 
-  theme(legend.position = "none", 
+  theme_new + fillGreySet3 + 
+  theme(legend.position = "bottom", 
         plot.title = element_text(hjust = 0.5))
 plt_bar_SlpIP_Exp6
 
@@ -1044,7 +1038,7 @@ plt_Exp1 <- ggarrange(plt_RprBias_Exp1, plt_bar_SlpIP_Exp1, plt_bar_WMCrr_Exp1,
 plt_Exp1
 
 plt_Exp2 <- ggarrange(plt_RprBias_Exp2, plt_bar_SlpIP_Exp2, plt_bar_WMCrr_Exp2, 
-                      common.legend = TRUE,labels = c("a", "b","c"), 
+                      common.legend = TRUE, legend = c("bottom"), labels = c("a", "b","c"), 
                       ncol=3, nrow=1, widths = c(4,4,4))
 plt_Exp2
 
@@ -1064,9 +1058,16 @@ plt_Exp5 <- ggarrange(plt_RprBias_Exp5, plt_bar_SlpIP_Exp5, plt_bar_WMCrr_Exp5,
 plt_Exp5
 
 plt_Exp6 <- ggarrange(plt_RprBias_Exp6, plt_bar_SlpIP_Exp6, plt_bar_WMCrr_Exp6, 
-                      common.legend = TRUE,labels = c("a", "b","c"), 
-                      ncol=3, nrow=1, widths = c(4,4,4))
+                      common.legend = TRUE, legend = c("bottom"),labels = c("a", "b","c"), 
+                      ncol=3, nrow=1, widths = c(5,3.5,3.5))
 plt_Exp6
+
+plt_Exp6_wide <- ggarrange(plt_RprBias_Exp6, 
+                      ggarrange(plt_bar_SlpIP_Exp6, plt_bar_WMCrr_Exp6,labels = c("b","c"), 
+                      legend = c("none"), ncol=2, nrow=1, widths = c(3.5,3.5)), 
+                      common.legend = TRUE, legend = c("bottom"),labels = c("a", ""), 
+                      ncol=1, nrow=2, heights = c(5,5))
+plt_Exp6_wide
 
 # save the plots to .png files
 ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp1.png"), 
@@ -1081,6 +1082,9 @@ ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp5.png"),
        plt_Exp5, width = 8.5, height = 3.54)
 ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp6.png"), 
        plt_Exp6, width = 8.5, height = 3.54)
+
+ggsave(paste0(getwd(), "/figures/plt_FigRvs4_Exp6_wide.png"), 
+       plt_Exp6_wide, width = 5, height = 6)
 
 ```
 
@@ -1239,31 +1243,6 @@ plt_RprBias_sub10 <- ggplot(data = mRpr_sub %>% filter(NSub==410),
 plt_RprBias_sub10
 
 
-
-
-```
-
-
-
-
-
-
-```{r}
-# plot data with estimated slope and IP
-ggplot() +
-  geom_hline(yintercept = 0, linetype='dashed') +
-  geom_errorbar(data = mRpr, aes(curDur, m_bias, ymin = m_bias - se_bias, 
-                               ymax = m_bias + se_bias, group = WMSize, color=as.factor(WMSize)), 
-                width=.1, position = position_dodge(width = 0.02)) +
-  geom_line(data = mRpr, aes(curDur, m_bias, group = WMSize, color=as.factor(WMSize)), 
-             linewidth = 0.5, linetype = 5, position=position_dodge(width=0.02)) +
-  geom_point(data = mRpr, aes(curDur, m_bias, group = WMSize, color=as.factor(WMSize)), 
-             size = 1, stat="identity", position=position_dodge(width=0.02)) +
-  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
-  labs(x="Durations (s)", y="Reproduction bias (s)", 
-       linetype ="data", color = "Memory Load")+
-  geom_smooth(data = Data_Exp1, aes(x=curDur, y=bias, color=WMSize), method=lm, se=FALSE) +
-  theme_new + colorSet3
 
 
 ```
