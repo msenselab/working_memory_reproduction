@@ -1,5 +1,5 @@
 ---
-title: "Analyses for MS_Rev of WM_Rpr"
+title: "Analyses for Manuscript - Influences of working memory on Duration Reproduction"
 author: "Jiao Wu"
 date: "2024-05-23"
 description: "adapted from Rvs3_WM_Rpr_beh_stats.Rmd and Rvs3_WM_Rpr_figs.Rmd"
@@ -45,19 +45,17 @@ source('mytheme.R')
 ```
 
 # Description of the revision
-Due to a failure of replication for Exp3, we revise the whole structure of the manuscript as follows:
-Exp 1 <-- original Exp 4
-Exp 2 <-- original Exp 5
-Exp 3 <-- original Exp 2
-Exp 4 <-- original Exp 3
-Exp 5 <-- original Exp 1
-Exp 6a,b,c <-- original Exp 6a,b,c
+For better understanding and linking findings across experiments, we have revise the order of experiments as follows:
+Exp 1 <-- Exp 4: Renting working memory across encoding and reproduction
+Exp 2 <-- Exp 5: Encoding-reproduction gap effect
+Exp 3 <-- Exp 2: Encoding phase
+Exp 4 <-- Exp 3: Reproduction phase
+Exp 5 <-- Exp 1: No WM effect
+Exp 6a,b,c <-- Exp 6a,b,c
 
-The story is that, first, we aim to explore the effect of WM on temporal reproduction (Exp 1). Then  (in Exp 2) we explore if the encoding-reproduction gap has an effect on temporal reproduction, and if yes, whether there is an interaction between WM effect and the gap effect.
-Next, we systematically explore the WM effect on each phase (encoding, reproduction, and none for Exp 3, 4, 5).
 Last, we apply a with-subject design and control the encoding-reproduction gap to confirm the WM effect on each phase (Exp 6a, 6b, 6c).
 
-To shorten the whole manuscript, we use a linear fitting on the Reproduction as a function of Duration, and report the statistics of the estimated slope (CT) and intercept (PSS).
+We use a linear fitting on the Reproduction as a function of Duration, and report the statistics of the estimated slope (CT) and intercept (PSS).
 
 
 # preparation: Load all behavioural data and Calculate variables for analysis
@@ -521,7 +519,49 @@ plt_RprBias_Exp5
 plt_RprBias_Exp6
 
 ```
+# Linear mixed-effect model for reproduction bias
 
+```{r}
+# linear mixed-effect model with dependent variable bias, fixed effect duration, WMSize, and their interaction, random effect NSub
+m_Exp1 = Data_Exp1 %>% group_by(NSub, curDur, WMSize) %>% summarise(mbias = mean(bias)*1000)
+# map WMSize to numeric
+m_Exp1$WMSize = as.numeric(m_Exp1$WMSize)
+model_1 = lmer(mbias ~ curDur * WMSize + (1|NSub), data = m_Exp1)
+# summary of the model
+summary(model_1)
+```
+
+
+```{r}
+# linear mixed-effect model with dependent variable bias, fixed effect duration, WMSize, and their interaction, random effect NSub
+m_Exp2 = Data_Exp2 %>% group_by(NSub, curDur, WMSize) %>% summarise(mbias = mean(bias)*1000)
+# map WMSize to numeric 
+m_Exp2$WMSize = as.numeric(m_Exp2$WMSize)
+model_2 = lmer(mbias ~ curDur * WMSize + (1|NSub), data = m_Exp2)
+# summary of the model
+summary(model_2)
+```
+
+
+```{r}
+# linear mixed-effect model with dependent variable bias, fixed effect duration, WMSize, and their interaction, random effect NSub
+m_Exp3 = Data_Exp3 %>% group_by(NSub, curDur, WMSize) %>% summarise(mbias = mean(bias)*1000)
+# map WMSize to numeric 
+m_Exp3$WMSize = as.numeric(m_Exp3$WMSize)
+model_3 = lmer(mbias ~ curDur * WMSize + (1|NSub), data = m_Exp3)
+# summary of the model
+summary(model_3)
+```
+
+```{r}
+# linear mixed-effect model with dependent variable bias, fixed effect duration, WMSize, and their interaction, random effect NSub
+m_Exp4 = Data_Exp4 %>% group_by(NSub, curDur, WMSize) %>% summarise(mbias = mean(bias)*1000)
+# map WMSize to numeric 
+m_Exp4$WMSize = as.numeric(m_Exp4$WMSize)
+model_4 = lmer(mbias ~ curDur * WMSize + (1|NSub), data = m_Exp4)
+# summary of the model
+summary(model_4)
+```
 # 3. linear fitting for reproduction bias
 
 ```{r}
