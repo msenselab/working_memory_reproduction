@@ -1,0 +1,79 @@
+---
+title: "Duration reproduction under memory pressure"
+author: "Jiao Wu"
+date: "2024-09-09"
+description: "Analyses for Manuscript Revision"
+output: html_document:
+    df_print: paged
+    number_sections: true
+  pdf_document: 
+    number_sections: true
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# load packages and functions
+```{r include=FALSE}
+library(rlist)
+library(ez)
+library(tidyverse)
+library(latex2exp)
+library(lsr)
+library(rticles)
+library(DescTools)
+library(heplots)
+library(lme4)
+library(rstatix)
+library(boot)
+library(ggpubr)
+library(reshape2)
+library(MASS)
+library(lmerTest)
+library(sjPlot)
+library(dplyr)
+source('mytheme.R')
+```
+
+# Description of the revision
+
+
+# load data
+```{r}
+# Data from Exp 1~5
+DataExps1to5 <- readRDS(paste0("../data/ValidData_Exp1to5.rds"))
+DataExp1 <- DataExps1to5 %>% filter(Exp == 'exp1')
+DataExp2 <- DataExps1to5 %>% filter(Exp == 'exp2')
+DataExp3 <- DataExps1to5 %>% filter(Exp == 'exp3')
+DataExp4 <- DataExps1to5 %>% filter(Exp == 'exp4')
+DataExp5 <- DataExps1to5 %>% filter(Exp == 'exp5')
+
+# Data from Exp 6a, 6b, and 6c
+DataExp6 <- readRDS(paste0("../data/ValidData_Exp6.rds"))
+
+```
+
+
+# Linear mixed-effect model for reproduction bias
+
+```{r}
+# linear mixed-effect model with dependent variable bias, fixed effect duration, WMSize, and their interaction, random effect NSub
+m_Exp1 = DataExp1 %>% group_by(NSub, curDur, WMSize) %>% summarise(mbias = mean(bias)*1000)
+model_1 = lmer(mbias ~ curDur * WMSize + (1|NSub), data = m_Exp1)
+summary(model_1)
+```
+
+
+
+```{r}
+
+m_Exp2 = DataExp2 %>% group_by(NSub, curDur, WMSize, gap) %>% summarise(mbias = mean(bias)*1000)
+m_Exp2$memory = (m_Exp2$WMSize-1)/2  # memory load 0, 1, 2
+m_Exp2$duration = m_Exp2$curDur - 1.1 # centered to 1.1 (middle point)
+model_2 = lmer(mbias ~ gap*memory*duration + (gap*duration*memory|NSub), data = m_Exp2)
+summary(model_2)
+
+```
+

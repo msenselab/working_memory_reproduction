@@ -64,7 +64,7 @@ We use a linear fitting on the Reproduction as a function of Duration, and repor
 ##################################
 # load valid data for original Exp 1-5
 AllExpData = read.csv(paste0("../data/AllValidData.csv")) %>% filter(valid == 1)
-AllExpData$WMSize <- factor(AllExpData$WMSize, labels=c("low","medium","high"))
+#AllExpData$WMSize <- factor(AllExpData$WMSize, labels=c("low","medium","high"))
 AllExpData$Exp = as.factor(AllExpData$Exp)
 AllExpData$NSub = as.numeric(AllExpData$Exp)*100 + AllExpData$NSub
 AllExpData$bias = AllExpData$repDur - AllExpData$curDur
@@ -81,6 +81,29 @@ Data_Exp6$WMSize <- factor(Data_Exp6$WMSize, labels = c("low","medium","high"))
 Data_Exp6$Exp = as.factor(Data_Exp6$Exp)
 Data_Exp6$bias = Data_Exp6$repDur - Data_Exp6$curDur
 ```
+
+# save data to rds file
+```{r}
+AllExpData = read.csv(paste0("../data/AllValidData.csv")) %>% filter(valid == 1)
+AllExpData[which(AllExpData$Exp == "Exp4"),"Exp"] = "exp1"
+AllExpData[which(AllExpData$Exp == "Exp5"),"Exp"] = "exp2"
+AllExpData[which(AllExpData$Exp == "Exp2"),"Exp"] = "exp3"
+AllExpData[which(AllExpData$Exp == "Exp3"),"Exp"] = "exp4"
+AllExpData[which(AllExpData$Exp == "Exp1"),"Exp"] = "exp5"
+AllExpData$WMFct <- factor(AllExpData$WMSize, labels = c("low","medium","high"))
+AllExpData$Exp = as.factor(AllExpData$Exp)
+AllExpData$NSub = as.numeric(AllExpData$Exp)*100 + AllExpData$NSub
+AllExpData$bias = AllExpData$repDur - AllExpData$curDur
+DataExp1to5 <- AllExpData[order(AllExpData$Exp),]
+saveRDS(DataExp1to5, file = "../data/ValidData_Exp1to5.rds")
+
+Data_Exp6 <- read.csv(paste0("../data/Exp6.csv")) %>% filter(valid == 1)
+Data_Exp6$WMFct <- factor(Data_Exp6$WMSize, labels = c("low","medium","high"))
+Data_Exp6$Exp = as.factor(Data_Exp6$Exp)
+Data_Exp6$bias = Data_Exp6$repDur - Data_Exp6$curDur
+saveRDS(Data_Exp6, file = "../data/ValidData_Exp6.rds")
+```
+
 
 # 1. Working memory task Accuracy
 ```{r}
