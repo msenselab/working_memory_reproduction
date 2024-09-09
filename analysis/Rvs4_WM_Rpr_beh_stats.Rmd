@@ -546,21 +546,33 @@ plt_RprBias_Exp6
 
 ```{r}
 # linear mixed-effect model with dependent variable bias, fixed effect duration, WMSize, and their interaction, random effect NSub
-m_Exp1 = Data_Exp1 %>% group_by(NSub, curDur, WMSize) %>% summarise(mbias = mean(bias)*1000)
+m_Exp1 = Data_Exp1 %>% group_by(NSub, curDur, WMSize, WM2) %>% summarise(mbias = mean(bias)*1000)
+#Data_Exp1$WM = as.factor(Data_Exp1$WMSize)
+#Data_Exp1$WMSize = (Data_Exp1$WMSize -1)/2
+#Data_Exp1$WM2 = Data_Exp1$WMSize^2
+#Data_Exp1$curDur = Data_Exp1$curDur - 1.1
+
 # map WMSize to numeric
-m_Exp1$WMSize = as.numeric(m_Exp1$WMSize)
-model_1 = lmer(mbias ~ curDur * WMSize + (1|NSub), data = m_Exp1)
+m_Exp1$WMSize = as.factor(m_Exp1$WMSize)
+m_Exp1$curDur = as.factor(m_Exp1$curDur)
+model_1 = lmer(mbias ~ curDur * WMSize  + (1|NSub), data = m_Exp1)
 # summary of the model
 summary(model_1)
 ```
+```{r}
+library(ez)
+ezANOVA(m_Exp1, dv = mbias, wid = NSub, within = .(curDur, WMSize), type = 3)
+
+```
+
 
 
 ```{r}
 # linear mixed-effect model with dependent variable bias, fixed effect duration, WMSize, and their interaction, random effect NSub
-m_Exp2 = Data_Exp2 %>% group_by(NSub, curDur, WMSize) %>% summarise(mbias = mean(bias)*1000)
+m_Exp2 = Data_Exp2 %>% group_by(NSub, curDur, WMSize, gap) %>% summarise(mbias = mean(bias)*1000)
 # map WMSize to numeric 
-m_Exp2$WMSize = as.numeric(m_Exp2$WMSize)
-model_2 = lmer(mbias ~ curDur * WMSize + (1|NSub), data = m_Exp2)
+#m_Exp2$WMSize = as.numeric(m_Exp2$WMSize)
+model_2 = lmer(mbias ~ curDur * WMSize*gap + (1|NSub), data = m_Exp2)
 # summary of the model
 summary(model_2)
 ```
