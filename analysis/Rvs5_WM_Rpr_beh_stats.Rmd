@@ -2,7 +2,7 @@
 title: "Duration reproduction under memory pressure"
 author: "Jiao Wu"
 date: "2024-09-09"
-description: "Analyses for Manuscript Revision"
+description: "Analyses for Revision of Manuscript"
 output: html_document:
     df_print: paged
     number_sections: true
@@ -37,43 +37,1026 @@ library(dplyr)
 source('mytheme.R')
 ```
 
-# Description of the revision
+# Description of the Analyses
+The data analyses includes:
+1) the effect of `Working Memory Load` on _Working memory task Accuracy_
+2) the effects of `Duration Levels` on _Duration reproduction bias_ to examine
+the central tendency effect, then explore the modulation of `Working Memory Load`
+on central tendency
+3) Linear-fitted _Slope_ of Duration reproduction bias by `Duration Levels` first
+being estimated as an indicator of central tendency, then examine the effect of
+`Working Memory Load` on estimated mean Slope
 
-
-# load data
+# load and prepare data
 ```{r}
 # Data from Exp 1~5
 DataExps1to5 <- readRDS(paste0("../data/ValidData_Exp1to5.rds"))
-DataExp1 <- DataExps1to5 %>% filter(Exp == 'exp1')
-DataExp2 <- DataExps1to5 %>% filter(Exp == 'exp2')
-DataExp3 <- DataExps1to5 %>% filter(Exp == 'exp3')
-DataExp4 <- DataExps1to5 %>% filter(Exp == 'exp4')
-DataExp5 <- DataExps1to5 %>% filter(Exp == 'exp5')
+Data_Exp1 <- DataExps1to5 %>% filter(Exp == 'exp1')
+Data_Exp2 <- DataExps1to5 %>% filter(Exp == 'exp2')
+Data_Exp3 <- DataExps1to5 %>% filter(Exp == 'exp3')
+Data_Exp4 <- DataExps1to5 %>% filter(Exp == 'exp4')
+Data_Exp5 <- DataExps1to5 %>% filter(Exp == 'exp5')
 
 # Data from Exp 6a, 6b, and 6c
-DataExp6 <- readRDS(paste0("../data/ValidData_Exp6.rds"))
-
+Data_Exp6 <- readRDS(paste0("../data/ValidData_Exp6.rds"))
 ```
 
+# 1. Working memory task Accuracy
+```{r}
+# calculate accuracy
+##################################
+Data_Exp1$WMCrr <- Data_Exp1$TPresent == Data_Exp1$WMRP
+Data_Exp2$WMCrr <- Data_Exp2$TPresent == Data_Exp2$WMRP
+Data_Exp3$WMCrr <- Data_Exp3$TPresent == Data_Exp3$WMRP
+Data_Exp4$WMCrr <- Data_Exp4$TPresent == Data_Exp4$WMRP
+Data_Exp5$WMCrr <- Data_Exp5$TPresent == Data_Exp5$WMRP
+Data_Exp6$WMCrr <- Data_Exp6$TPresent == Data_Exp6$WMRP
 
-# Linear mixed-effect model for reproduction bias
+# Exp 1 & 3-5 (factor: WM load)
+WMCrr_Exp1 <- dplyr::group_by(Data_Exp1, WMFct, NSub) %>%
+  dplyr::summarize(n = n(), m_WMCrr=mean(WMCrr), se_WMCrr=sd(WMCrr)/sqrt(n-1))
+WMCrr_Exp1 %>% dplyr::group_by(WMFct) %>%
+  dplyr::summarize(n = n(), mean_WMCrr = mean(m_WMCrr), 
+                    se_WMCrr = sd(m_WMCrr)/sqrt(n-1) ) -> WMCrrForExp1
+
+WMCrr_Exp3 <- dplyr::group_by(Data_Exp3, WMFct, NSub) %>%
+  dplyr::summarize(n = n(), m_WMCrr=mean(WMCrr), se_WMCrr=sd(WMCrr)/sqrt(n-1))
+WMCrr_Exp3 %>% dplyr::group_by(WMFct) %>%
+  dplyr::summarize(n = n(), mean_WMCrr = mean(m_WMCrr), 
+                    se_WMCrr = sd(m_WMCrr)/sqrt(n-1) ) -> WMCrrForExp3
+
+WMCrr_Exp4 <- dplyr::group_by(Data_Exp4, WMFct, NSub) %>%
+  dplyr::summarize(n = n(), m_WMCrr=mean(WMCrr), se_WMCrr=sd(WMCrr)/sqrt(n-1))
+WMCrr_Exp4 %>% dplyr::group_by(WMFct) %>%
+  dplyr::summarize(n = n(), mean_WMCrr = mean(m_WMCrr), 
+                    se_WMCrr = sd(m_WMCrr)/sqrt(n-1) ) -> WMCrrForExp4
+
+WMCrr_Exp5 <- dplyr::group_by(Data_Exp5, WMFct, NSub) %>%
+  dplyr::summarize(n = n(), m_WMCrr=mean(WMCrr), se_WMCrr=sd(WMCrr)/sqrt(n-1))
+WMCrr_Exp5 %>% dplyr::group_by(WMFct) %>%
+  dplyr::summarize(n = n(), mean_WMCrr = mean(m_WMCrr), 
+                    se_WMCrr = sd(m_WMCrr)/sqrt(n-1) ) -> WMCrrForExp5
+
+# Exp 2 (factors: WM load, Gap)
+WMCrr_Exp2 <- dplyr::group_by(Data_Exp2, WMFct, NSub, gap) %>%
+  dplyr::summarize(n = n(), m_WMCrr = mean(WMCrr), se_WMCrr = sd(WMCrr)/sqrt(n-1))
+WMCrr_Exp2$gap <- factor(WMCrr_Exp2$gap, labels = c("short", "long"))
+WMCrr_Exp2 %>% dplyr::group_by(gap, WMFct) %>%
+  dplyr::summarize(n = n(), mean_WMCrr = mean(m_WMCrr), 
+                   se_WMCrr = sd(m_WMCrr)/sqrt(n-1)) -> WMCrrForExp2
+
+# Exp 6 (factor: WM load, Exp)
+WMCrr_Exp6 <- dplyr::group_by(Data_Exp6, Exp, WMFct, NSub) %>% 
+  dplyr::summarize(n = n(), m_WMCrr = mean(WMCrr), 
+                   se_WMCrr = sd(WMCrr)/sqrt(n-1))
+WMCrr_Exp6 %>% dplyr::group_by(Exp, WMFct) %>%
+  dplyr::summarize(n = n(), mean_WMCrr = mean(m_WMCrr),
+                   se_WMCrr = sd(m_WMCrr)/sqrt(n-1) ) -> WMCrrForExp6
+
+```
 
 ```{r}
-# linear mixed-effect model with dependent variable bias, fixed effect duration, WMSize, and their interaction, random effect NSub
-m_Exp1 = DataExp1 %>% group_by(NSub, curDur, WMSize) %>% summarise(mbias = mean(bias)*1000)
-model_1 = lmer(mbias ~ curDur * WMSize + (1|NSub), data = m_Exp1)
-summary(model_1)
-```
+# plot working memory task accuracy
+##################################
+# Exp 1
+plt_bar_WMCrr_Exp1 <- ggplot(WMCrrForExp1,aes(x=WMFct, y=mean_WMCrr)) +
+  geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_WMCrr-se_WMCrr, ymax=mean_WMCrr+se_WMCrr), 
+                width=.1,  position = position_dodge()) +
+  geom_signif(comparisons=list(c("low", "medium")), annotations="", 
+              y_position = 0.93, tip_length = 0.05, vjust=0.4, color = 'black') +
+  annotate(geom="text", label="***", x=1.5, y=0.96, size=6) +
+  geom_signif(comparisons=list(c("medium", "high")), annotations="", 
+              y_position = 0.83, tip_length = 0.05, vjust=0.4, color = 'black') +
+  annotate(geom="text", label="***", x=2.5, y=0.86, size=6) +
+  coord_cartesian(ylim = c(0.5, 1)) +
+  labs(x="Memory load", y="Mean accuracy", title="Memory test") +
+  theme_new +
+  theme(plot.title = element_text(hjust = 0.5))
+plt_bar_WMCrr_Exp1
 
+# Exp 2
+plt_bar_WMCrr_Exp2 <- ggplot(WMCrrForExp2,aes(x=gap, y=mean_WMCrr, 
+                                              group=interaction(WMFct, gap))) +
+  geom_bar(stat="identity", aes(fill=WMFct), position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_WMCrr-se_WMCrr, ymax=mean_WMCrr+se_WMCrr), 
+                width=.1, position = position_dodge(.9)) + 
+  coord_cartesian(ylim = c(0.5, 1)) +
+  geom_signif(annotations=c("***","***","***","***"), 
+              y_position = c(0.96, 0.86, 0.96, 0.86), tip_length = 0.05, 
+              xmin = c(0.6, 1, 1.6, 2), xmax = c(1, 1.4, 2, 2.4),
+              color = 'black') +
+  labs(x="Gap", y="Mean accuracy", fill="Memory Load", title="Memory test") +
+  theme_new + fillGreySet3 + theme(plot.title = element_text(hjust = 0.5))
+plt_bar_WMCrr_Exp2
+
+# Exp 3
+plt_bar_WMCrr_Exp3 <- ggplot(WMCrrForExp3,aes(x=WMFct, y=mean_WMCrr)) +
+  geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_WMCrr-se_WMCrr, ymax=mean_WMCrr+se_WMCrr), 
+                width=.1,  position = position_dodge()) +
+  geom_signif(comparisons=list(c("low", "medium")), annotations="", 
+              y_position = 0.96, tip_length = 0.05, vjust=0.4, color = 'black') +
+  annotate(geom="text", label="***", x=1.5, y=0.99, size=6) +
+  geom_signif(comparisons=list(c("medium", "high")), annotations="", 
+              y_position = 0.83, tip_length = 0.05, vjust=0.4, color = 'black') +
+  annotate(geom="text", label="**", x=2.5, y=0.86, size=6) +
+  coord_cartesian(ylim = c(0.5, 1)) +
+  labs(x="Memory load", y="Mean accuracy", title="Memory test") +
+  theme_new +
+  theme(plot.title = element_text(hjust = 0.5))
+plt_bar_WMCrr_Exp3
+
+# Exp 4
+plt_bar_WMCrr_Exp4 <- ggplot(WMCrrForExp4,aes(x=WMFct, y=mean_WMCrr)) +
+  geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_WMCrr-se_WMCrr, ymax=mean_WMCrr+se_WMCrr), 
+                width=.1,  position = position_dodge()) +
+  geom_signif(comparisons=list(c("low", "medium")), annotations="", 
+              y_position = 0.96, tip_length = 0.05, vjust=0.4, color = 'black') +
+  annotate(geom="text", label="***", x=1.5, y=0.99, size=6) +
+  geom_signif(comparisons=list(c("medium", "high")), annotations="", 
+              y_position = 0.83, tip_length = 0.05, vjust=0.4, color = 'black') +
+  annotate(geom="text", label="***", x=2.5, y=0.86, size=6) +
+  coord_cartesian(ylim = c(0.5, 1)) +
+  labs(x="Memory load", y="Mean accuracy", title="Memory test") +
+  theme_new +
+  theme(plot.title = element_text(hjust = 0.5))
+plt_bar_WMCrr_Exp4
+
+# Exp 5
+plt_bar_WMCrr_Exp5 <- ggplot(WMCrrForExp5,aes(x=WMFct, y=mean_WMCrr)) +
+  geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_WMCrr-se_WMCrr, ymax=mean_WMCrr+se_WMCrr), 
+                width=.1,  position = position_dodge()) +
+  geom_signif(comparisons=list(c("low", "medium")), annotations="", 
+              y_position = 0.98, tip_length = 0.05, vjust=0.4, color = 'black') +
+  annotate(geom="text", label="***", x=1.5, y=1.01, size=6) +
+  geom_signif(comparisons=list(c("medium", "high")), annotations="", 
+              y_position = 0.86, tip_length = 0.05, vjust=0.4, color = 'black') +
+  annotate(geom="text", label="***", x=2.5, y=0.89, size=6) +
+  coord_cartesian(ylim = c(0.5, 1)) +
+  labs(x="Memory load", y="Mean accuracy", title="Memory test") +
+  theme_new +
+  theme(plot.title = element_text(hjust = 0.5))
+plt_bar_WMCrr_Exp5
+
+# Exp 6
+plt_bar_WMCrr_Exp6 <- ggplot(WMCrrForExp6,aes(x=Exp, y=mean_WMCrr, 
+                                              group=interaction(WMFct, Exp))) +
+  geom_bar(stat="identity", aes(fill=WMFct), position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean_WMCrr-se_WMCrr, ymax=mean_WMCrr+se_WMCrr), 
+                width=.1, position = position_dodge(.9)) + 
+  coord_cartesian(ylim = c(0.5, 1)) +
+  geom_signif(annotations=c("***","***","***","***","***","***"), 
+              y_position = c(0.96, 0.86, 0.95, 0.84, 0.98, 0.89), tip_length = 0.05, 
+              xmin = c(0.7, 1, 1.7, 2, 2.7, 3), xmax = c(1, 1.3, 2, 2.3, 3, 3.3),
+              color = 'black') +
+  labs(x="Experiment", y="Mean accuracy", fill="Memory Load", title="Memory test") + 
+  theme_new + fillGreySet3 + theme(plot.title = element_text(hjust = 0.5))
+plt_bar_WMCrr_Exp6
+
+```
 
 
 ```{r}
+# ANOVA on WM accuracy
+##################################
+# Exp 1
+tmp_aov <- ezANOVA(data = WMCrr_Exp1, dv= m_WMCrr,
+                   wid = NSub, within = .(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_WMCrr_Exp1 <- tmp_aov
+print(anova_WMCrr_Exp1)
 
-m_Exp2 = DataExp2 %>% group_by(NSub, curDur, WMSize, gap) %>% summarise(mbias = mean(bias)*1000)
-m_Exp2$memory = (m_Exp2$WMSize-1)/2  # memory load 0, 1, 2
-m_Exp2$duration = m_Exp2$curDur - 1.1 # centered to 1.1 (middle point)
-model_2 = lmer(mbias ~ gap*memory*duration + (gap*duration*memory|NSub), data = m_Exp2)
-summary(model_2)
+# Exp 2
+tmp_aov <- ezANOVA(data = WMCrr_Exp2, dv= m_WMCrr,
+                   wid = NSub, within = c(WMFct, gap), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_WMCrr_Exp2 <- tmp_aov
+print(anova_WMCrr_Exp2)
+
+# Exp 3
+tmp_aov <- ezANOVA(data = WMCrr_Exp3, dv= m_WMCrr,
+                   wid = NSub, within = .(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_WMCrr_Exp3 <- tmp_aov
+print(anova_WMCrr_Exp3)
+
+# Exp 4
+tmp_aov <- ezANOVA(data = WMCrr_Exp4, dv= m_WMCrr,
+                   wid = NSub, within = .(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_WMCrr_Exp4 <- tmp_aov
+print(anova_WMCrr_Exp4)
+
+# Exp 5
+tmp_aov <- ezANOVA(data = WMCrr_Exp5, dv= m_WMCrr,
+                   wid = NSub, within = .(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_WMCrr_Exp5 <- tmp_aov
+print(anova_WMCrr_Exp5)
+
+# Greenhouse-Geisser corrections for Exp 5
+Effect <- "WMFct-GG-corrected"
+DFn <- anova_WMCrr_Exp5$`Sphericity Corrections`$GGe * anova_WMCrr_Exp5$ANOVA$DFn[2]
+DFd <- anova_WMCrr_Exp5$`Sphericity Corrections`$GGe * anova_WMCrr_Exp5$ANOVA$DFd[2]
+F <- anova_WMCrr_Exp5$ANOVA$F[2]
+p <- anova_WMCrr_Exp5$`Sphericity Corrections`$`p[GG]`
+partial_eta2 <- anova_WMCrr_Exp5$ANOVA$partial_eta2[2]
+anova_WMCrr_Exp5_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_WMCrr_Exp5_GGcr)
+
+# Exp 6
+tmp_aov <- ezANOVA(data = WMCrr_Exp6, dv= m_WMCrr,
+                   wid = NSub, within = c(WMFct, Exp), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_WMCrr_Exp6 <- tmp_aov
+print(anova_WMCrr_Exp6)
 
 ```
+
+
+# 2. Duration reproduction bias
+```{r}
+# calculate reproduction bias
+##################################
+
+# Exp 1 & 3-5 (factors: Duration, WM load)
+mRpr_Exp1_sub <- dplyr::group_by(Data_Exp1, curDur, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), m_repDur = mean(repDur), sd_repDur = sd(repDur),
+                   cv = sd_repDur/ m_repDur, mBias = mean(repDur-curDur),
+                   sdBias = sd(repDur-curDur))
+mRpr_Exp1 <- mRpr_Exp1_sub %>% dplyr::group_by(curDur, WMFct) %>% 
+  dplyr::summarize(n = n(), m_m_repDur = mean(m_repDur),
+                   m_bias = mean(m_repDur-curDur), 
+                   se_bias = sd(m_repDur-curDur)/sqrt(n-1),
+                   m_cv= mean(cv), se_cv=sd(cv)/sqrt(n-1))
+
+mRpr_Exp3_sub <- dplyr::group_by(Data_Exp3, curDur, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), m_repDur = mean(repDur), sd_repDur = sd(repDur),
+                   cv = sd_repDur/ m_repDur, mBias = mean(repDur-curDur),
+                   sdBias = sd(repDur-curDur))
+mRpr_Exp3 <- mRpr_Exp3_sub %>% dplyr::group_by(curDur, WMFct) %>% 
+  dplyr::summarize(n = n(), m_m_repDur = mean(m_repDur),
+                   m_bias = mean(m_repDur-curDur), 
+                   se_bias = sd(m_repDur-curDur)/sqrt(n-1),
+                   m_cv= mean(cv), se_cv=sd(cv)/sqrt(n-1))
+
+mRpr_Exp4_sub <- dplyr::group_by(Data_Exp4, curDur, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), m_repDur = mean(repDur), sd_repDur = sd(repDur),
+                   cv = sd_repDur/ m_repDur, mBias = mean(repDur-curDur),
+                   sdBias = sd(repDur-curDur))
+mRpr_Exp4 <- mRpr_Exp4_sub %>% dplyr::group_by(curDur, WMFct) %>% 
+  dplyr::summarize(n = n(), m_m_repDur = mean(m_repDur),
+                   m_bias = mean(m_repDur-curDur), 
+                   se_bias = sd(m_repDur-curDur)/sqrt(n-1),
+                   m_cv= mean(cv), se_cv=sd(cv)/sqrt(n-1))
+
+mRpr_Exp5_sub <- dplyr::group_by(Data_Exp5, curDur, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), m_repDur = mean(repDur), sd_repDur = sd(repDur),
+                   cv = sd_repDur/ m_repDur, mBias = mean(repDur-curDur),
+                   sdBias = sd(repDur-curDur))
+mRpr_Exp5 <- mRpr_Exp5_sub %>% dplyr::group_by(curDur, WMFct) %>% 
+  dplyr::summarize(n = n(), m_m_repDur = mean(m_repDur),
+                   m_bias = mean(m_repDur-curDur), 
+                   se_bias = sd(m_repDur-curDur)/sqrt(n-1),
+                   m_cv= mean(cv), se_cv=sd(cv)/sqrt(n-1))
+
+# Exp 2 (factors: Duration, WM load, gap)
+Data_Exp2$gap <- factor(Data_Exp2$gap, labels = c("short", "long")) # mark Gap
+
+mRpr_Exp2_sub <- dplyr::group_by(Data_Exp2, curDur, NSub, WMFct, gap) %>%
+  dplyr::summarize(n = n(), m_repDur = mean(repDur), sd_repDur = sd(repDur),
+                   cv = sd_repDur/ m_repDur)
+mRpr_Exp2 <- mRpr_Exp2_sub %>% dplyr::group_by(curDur, WMFct, gap) %>% 
+  dplyr::summarize(n = n(), m_m_repDur = mean(m_repDur),
+                   m_bias = mean(m_repDur-curDur), 
+                   se_bias = sd(m_repDur-curDur)/sqrt(n-1),
+                   m_cv= mean(cv), se_cv=sd(cv)/sqrt(n-1))
+mRpr_Exp2$Gap = factor(mRpr_Exp2$gap, labels=c("short gap","long gap"))
+
+# Exp 6 (factors: Duration, WM load, Exp)
+mRpr_Exp6_sub <-  dplyr::group_by(Data_Exp6, curDur, Exp, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), m_repDur = mean(repDur), sd_repDur = sd(repDur),
+                   cv = sd_repDur/ m_repDur)
+mRpr_Exp6 <- mRpr_Exp6_sub %>% dplyr::group_by(Exp, curDur, WMFct) %>% 
+  dplyr::summarize(n = n(), m_m_repDur = mean(m_repDur),
+                   m_bias = mean(m_repDur-curDur),
+                   se_bias = sd(m_repDur-curDur)/sqrt(n-1),
+                   m_cv= mean(cv), se_cv=sd(cv)/sqrt(n-1))
+```
+
+
+```{r}
+# plot reproduction bias
+##################################
+jt <- 0.03
+# Exp 1
+plt_RprBias_Exp1 <- ggplot(data = mRpr_Exp1,
+                           aes(curDur, m_bias, ymin = m_bias - se_bias, 
+                               ymax = m_bias + se_bias, group = WMFct,
+                               color=as.factor(WMFct), 
+                               shape = as.factor(WMFct))) +
+  geom_line(aes(color = WMFct), 
+            stat = "identity",position = position_dodge(width = jt)) + 
+  geom_hline(yintercept = 0, linetype='dashed') +
+  geom_point(size = 2, stat="identity", position=position_dodge(width=jt)) +
+  geom_errorbar(width=.2,  position = position_dodge(width = jt)) +
+  coord_cartesian(ylim = c(-0.5, 0.4)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
+       shape ="Memory Load", color = "Memory Load") +
+  theme_new + greySet3 +
+  theme(legend.position = c(.7,.8), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5))
+
+# Exp 2
+plt_RprBias_Exp2 <- ggplot(data = mRpr_Exp2,
+                           aes(curDur, m_bias, ymin = m_bias - se_bias, 
+                               ymax = m_bias + se_bias, 
+                               group = interaction(WMFct, Gap),
+                               color=as.factor(WMFct), 
+                               shape=as.factor(WMFct))) +
+  geom_line(stat = "identity",position = position_dodge(width = jt)) +
+  geom_hline(yintercept = 0, linetype='dashed') +
+  geom_point(size = 2, stat="identity", position=position_dodge(width=jt)) +
+  geom_errorbar(width=.2,  position = position_dodge(width = jt)) +
+  facet_wrap("Gap") +
+  coord_cartesian(ylim = c(-0.5, 0.4)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
+       shape ="Memory Load", color = "Memory Load") +
+  theme_new + greySet3 + 
+  theme(legend.position = c(.8,.8), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5))
+
+# Exp 3
+plt_RprBias_Exp3 <- ggplot(data = mRpr_Exp3,
+                           aes(curDur, m_bias, ymin = m_bias - se_bias, 
+                               ymax = m_bias + se_bias, group = WMFct,
+                               color=as.factor(WMFct), 
+                               shape = as.factor(WMFct))) +
+  geom_line(aes(color = WMFct), 
+            stat = "identity",position = position_dodge(width = jt)) +
+  geom_hline(yintercept = 0, linetype='dashed') +
+  geom_point(size = 2, stat="identity", position=position_dodge(width=jt)) +
+  geom_errorbar(width=.2,  position = position_dodge(width = jt)) +
+  coord_cartesian(ylim = c(-0.5, 0.4)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
+       shape ="Memory Load", color = "Memory Load")+
+  theme_new + greySet3 +
+  theme(legend.position = c(.7,.8), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5))
+
+# Exp 4
+plt_RprBias_Exp4 <- ggplot(data = mRpr_Exp4,
+                           aes(curDur, m_bias, ymin = m_bias - se_bias, 
+                               ymax = m_bias + se_bias, group = WMFct,
+                               color=as.factor(WMFct), 
+                               shape = as.factor(WMFct))) +
+  geom_line(aes(color = WMFct), 
+            stat = "identity", position = position_dodge(width = jt)) +
+  geom_hline(yintercept = 0, linetype='dashed') +
+  geom_point(size = 2, stat="identity", position=position_dodge(width=jt)) +
+  geom_errorbar(width=.2,  position = position_dodge(width = jt)) +
+  coord_cartesian(ylim = c(-0.5, 0.4)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
+       shape ="Memory Load", color = "Memory Load")+
+  theme_new + greySet3 +
+  theme(legend.position = c(.7,.8), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5))
+
+# Exp 5
+plt_RprBias_Exp5 <- ggplot(data = mRpr_Exp5,
+                           aes(curDur, m_bias, ymin = m_bias - se_bias, 
+                               ymax = m_bias + se_bias, group = WMFct,
+                               color=as.factor(WMFct), 
+                               shape = as.factor(WMFct))) +
+  geom_line(aes(color = WMFct), 
+            stat = "identity",position = position_dodge(width = jt)) +
+  geom_hline(yintercept = 0, linetype='dashed') +
+  geom_point(size = 2, stat="identity", position=position_dodge(width=jt)) +
+  geom_errorbar(width=.2,  position = position_dodge(width = jt)) +
+  coord_cartesian(ylim = c(-0.5, 0.4)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  labs(x="Durations (s)", y="Reproduction bias (s)", title="Duration Reproduction",
+       shape ="Memory Load", color = "Memory Load")+
+  theme_new + greySet3 +
+  theme(legend.position = c(.7,.8), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5))
+
+# Exp 6
+plt_RprBias_Exp6 <- ggplot(data = mRpr_Exp6,
+                           aes(curDur, m_bias, ymin = m_bias - se_bias, 
+                               ymax = m_bias + se_bias,
+                               group = interaction(WMFct, Exp),
+                               color = as.factor(WMFct), 
+                               shape = as.factor(WMFct))) +
+  geom_line(aes(color = WMFct),
+            stat = "identity", position = position_dodge(width = jt)) +
+  geom_hline(yintercept = 0, linetype='dashed') +
+  geom_point(size = 2, stat="identity", position=position_dodge(width=jt)) +
+  geom_errorbar(width=.2,  position = position_dodge(width = jt)) +
+  facet_wrap("Exp") +
+  coord_cartesian(ylim = c(-0.35, 0.2)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  labs(x="", y="Reproduction bias (s)", title="Duration Reproduction",
+       shape ="Memory Load", color = "Memory Load") + 
+  theme_new + greySet3 + 
+  theme(legend.position = c(.9,.8), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"),
+        strip.text = element_text(size=10, face = "bold"),
+        plot.title = element_text(hjust = 0.5))
+
+plt_RprBias_Exp1
+plt_RprBias_Exp2
+plt_RprBias_Exp3
+plt_RprBias_Exp4
+plt_RprBias_Exp5
+plt_RprBias_Exp6
+```
+
+```{r}
+# ANOVA on mean Reproduction Bias
+##################################
+# Exp 1
+mBias_Exp1_sub <- dplyr::group_by(Data_Exp1, DurLevel, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), mBias = mean(repDur-curDur))
+mBias_Exp1_sub$DurLevel <- as.factor(mBias_Exp1_sub$DurLevel)
+tmp_aov <- ezANOVA(data = mBias_Exp1_sub, dv= mBias,
+                   wid = NSub, within = .(DurLevel, WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_mBias_Exp1 <- tmp_aov
+print(anova_mBias_Exp1)
+
+# Greenhouse-Geisser corrections for Exp 1
+Effect <- "DurLevel-GG-corrected"
+DFn <- anova_mBias_Exp1$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp1$ANOVA$DFn[2]
+DFd <- anova_mBias_Exp1$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp1$ANOVA$DFd[2]
+F <- anova_mBias_Exp1$ANOVA$F[2]
+p <- anova_mBias_Exp1$`Sphericity Corrections`$`p[GG]`[1]
+partial_eta2 <- anova_mBias_Exp1$ANOVA$partial_eta2[2]
+anova_mBias_Exp1_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_mBias_Exp1_GGcr)
+
+# Summary statistics of the mean bias by groups (DurLevel)
+Exp1_mBias_by_dur <- mBias_Exp1_sub %>% 
+  group_by(DurLevel) %>% get_summary_stats(mBias, type="mean_se")
+print(Exp1_mBias_by_dur)
+# Summary statistics of the mean bias by groups (WMFct)
+Exp1_mBias_by_wm <- mBias_Exp1_sub %>% 
+  group_by(WMFct) %>% get_summary_stats(mBias, type="mean_se")
+print(Exp1_mBias_by_wm)
+
+# Exp 2
+mBias_Exp2_sub <- dplyr::group_by(Data_Exp2, DurLevel, NSub, WMFct, gap) %>%
+  dplyr::summarize(n = n(), mBias = mean(repDur-curDur))
+mBias_Exp2_sub$DurLevel <- as.factor(mBias_Exp2_sub$DurLevel)
+tmp_aov <- ezANOVA(data = mBias_Exp2_sub, dv= mBias,
+                   wid = NSub, within = c(DurLevel, WMFct, gap), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_mBias_Exp2 <- tmp_aov
+print(anova_mBias_Exp2)
+
+# Greenhouse-Geisser corrections for Exp 2
+Effect <- c("DurLevel-GG-corrected", "WMFct-GG-corrected", "3wayInteract-GG-corrected")
+DFn <- c(anova_mBias_Exp2$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp2$ANOVA$DFn[2],
+         anova_mBias_Exp2$`Sphericity Corrections`$GGe[2] * anova_mBias_Exp2$ANOVA$DFn[3],
+         anova_mBias_Exp2$`Sphericity Corrections`$GGe[6] * anova_mBias_Exp2$ANOVA$DFn[8])
+DFd <- c(anova_mBias_Exp2$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp2$ANOVA$DFd[2],
+         anova_mBias_Exp2$`Sphericity Corrections`$GGe[2] * anova_mBias_Exp2$ANOVA$DFd[3],
+         anova_mBias_Exp2$`Sphericity Corrections`$GGe[6] * anova_mBias_Exp2$ANOVA$DFd[8])
+F <- c(anova_mBias_Exp2$ANOVA$F[2], anova_mBias_Exp2$ANOVA$F[3], anova_mBias_Exp2$ANOVA$F[8])
+p <- c(anova_mBias_Exp2$`Sphericity Corrections`$`p[GG]`[1],
+       anova_mBias_Exp2$`Sphericity Corrections`$`p[GG]`[2],
+       anova_mBias_Exp2$`Sphericity Corrections`$`p[GG]`[6])
+partial_eta2 <- c(anova_mBias_Exp2$ANOVA$partial_eta2[2], anova_mBias_Exp2$ANOVA$partial_eta2[3],
+                  anova_mBias_Exp2$ANOVA$partial_eta2[8])
+anova_mBias_Exp2_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_mBias_Exp2_GGcr)
+
+# Exp 3
+mBias_Exp3_sub <- dplyr::group_by(Data_Exp3, DurLevel, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), mBias = mean(repDur-curDur))
+mBias_Exp3_sub$DurLevel <- as.factor(mBias_Exp3_sub$DurLevel)
+tmp_aov <- ezANOVA(data = mBias_Exp3_sub, dv= mBias,
+                   wid = NSub, within = .(DurLevel, WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_mBias_Exp3 <- tmp_aov
+print(anova_mBias_Exp3)
+
+# Greenhouse-Geisser corrections for Exp 3
+Effect <- "DurLevel-GG-corrected"
+DFn <- anova_mBias_Exp3$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp3$ANOVA$DFn[2]
+DFd <- anova_mBias_Exp3$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp3$ANOVA$DFd[2]
+F <- anova_mBias_Exp3$ANOVA$F[2]
+p <- anova_mBias_Exp3$`Sphericity Corrections`$`p[GG]`[1]
+partial_eta2 <- anova_mBias_Exp3$ANOVA$partial_eta2[2]
+anova_mBias_Exp3_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_mBias_Exp3_GGcr)
+
+# Exp 4
+mBias_Exp4_sub <- dplyr::group_by(Data_Exp4, DurLevel, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), mBias = mean(repDur-curDur))
+mBias_Exp4_sub$DurLevel <- as.factor(mBias_Exp4_sub$DurLevel)
+tmp_aov <- ezANOVA(data = mBias_Exp4_sub, dv= mBias,
+                   wid = NSub, within = .(DurLevel, WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_mBias_Exp4 <- tmp_aov
+print(anova_mBias_Exp4)
+
+# Greenhouse-Geisser corrections for Exp 4
+Effect <- c("DurLevel-GG-corrected", "2wayInteract-GG-corrected")
+DFn <- c(anova_mBias_Exp4$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp4$ANOVA$DFn[2],
+         anova_mBias_Exp4$`Sphericity Corrections`$GGe[3] * anova_mBias_Exp4$ANOVA$DFn[4])
+DFd <- c(anova_mBias_Exp4$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp4$ANOVA$DFd[2],
+         anova_mBias_Exp4$`Sphericity Corrections`$GGe[3] * anova_mBias_Exp4$ANOVA$DFd[4])
+F <- c(anova_mBias_Exp4$ANOVA$F[2], anova_mBias_Exp4$ANOVA$F[4])
+p <- c(anova_mBias_Exp4$`Sphericity Corrections`$`p[GG]`[1],
+       anova_mBias_Exp4$`Sphericity Corrections`$`p[GG]`[3])
+partial_eta2 <- c(anova_mBias_Exp4$ANOVA$partial_eta2[2], anova_mBias_Exp4$ANOVA$partial_eta2[4])
+anova_mBias_Exp4_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_mBias_Exp4_GGcr)
+
+# Exp 5
+mBias_Exp5_sub <- dplyr::group_by(Data_Exp5, DurLevel, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), mBias = mean(repDur-curDur))
+mBias_Exp5_sub$DurLevel <- as.factor(mBias_Exp5_sub$DurLevel)
+tmp_aov <- ezANOVA(data = mBias_Exp5_sub, dv= mBias,
+                   wid = NSub, within = .(DurLevel, WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_mBias_Exp5 <- tmp_aov
+print(anova_mBias_Exp5)
+
+# Greenhouse-Geisser corrections for Exp 5
+Effect <- "DurLevel-GG-corrected"
+DFn <- anova_mBias_Exp5$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp5$ANOVA$DFn[2]
+DFd <- anova_mBias_Exp5$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp5$ANOVA$DFd[2]
+F <- anova_mBias_Exp5$ANOVA$F[2]
+p <- anova_mBias_Exp5$`Sphericity Corrections`$`p[GG]`[1]
+partial_eta2 <- anova_mBias_Exp5$ANOVA$partial_eta2[2]
+anova_mBias_Exp5_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_mBias_Exp5_GGcr)
+
+# Exp 6
+mBias_Exp6_sub <- dplyr::group_by(Data_Exp6, DurLevel, NSub, WMFct, Exp) %>%
+  dplyr::summarize(n = n(), mBias = mean(repDur-curDur))
+mBias_Exp6_sub$DurLevel <- as.factor(mBias_Exp6_sub$DurLevel)
+tmp_aov <- ezANOVA(data = mBias_Exp6_sub, dv= mBias,
+                   wid = NSub, within = c(DurLevel, WMFct, Exp), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_mBias_Exp6 <- tmp_aov
+print(anova_mBias_Exp6)
+
+# Greenhouse-Geisser corrections for Exp 6
+Effect <- c("DurLevel-GG-corrected", "WMFct-GG-corrected", "3wayInteract-GG-corrected")
+DFn <- c(anova_mBias_Exp6$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp6$ANOVA$DFn[2],
+         anova_mBias_Exp6$`Sphericity Corrections`$GGe[2] * anova_mBias_Exp6$ANOVA$DFn[3],
+         anova_mBias_Exp6$`Sphericity Corrections`$GGe[5] * anova_mBias_Exp6$ANOVA$DFn[6])
+DFd <- c(anova_mBias_Exp6$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp6$ANOVA$DFd[2],
+         anova_mBias_Exp6$`Sphericity Corrections`$GGe[2] * anova_mBias_Exp6$ANOVA$DFd[3],
+         anova_mBias_Exp6$`Sphericity Corrections`$GGe[5] * anova_mBias_Exp6$ANOVA$DFd[6])
+F <- c(anova_mBias_Exp6$ANOVA$F[2], anova_mBias_Exp6$ANOVA$F[3], anova_mBias_Exp6$ANOVA$F[6])
+p <- c(anova_mBias_Exp6$`Sphericity Corrections`$`p[GG]`[1],
+       anova_mBias_Exp6$`Sphericity Corrections`$`p[GG]`[2],
+       anova_mBias_Exp6$`Sphericity Corrections`$`p[GG]`[5])
+partial_eta2 <- c(anova_mBias_Exp6$ANOVA$partial_eta2[2], anova_mBias_Exp6$ANOVA$partial_eta2[3],
+                  anova_mBias_Exp6$ANOVA$partial_eta2[6])
+anova_mBias_Exp6_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_mBias_Exp6_GGcr)
+
+
+# Exp 6a
+mBias_Exp6a_sub <- dplyr::group_by(Data_Exp6 %>% filter(Exp=="Exp. 6a"),
+                                  DurLevel, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), mBias = mean(repDur-curDur))
+mBias_Exp6a_sub$DurLevel <- as.factor(mBias_Exp6a_sub$DurLevel)
+tmp_aov <- ezANOVA(data = mBias_Exp6a_sub, dv= mBias,
+                   wid = NSub, within = c(DurLevel, WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_mBias_Exp6a <- tmp_aov
+print(anova_mBias_Exp6a)
+
+# Greenhouse-Geisser corrections for Exp 6a
+Effect <- c("DurLevel-GG-corrected", "WMFct-GG-corrected", "2wayInteract-GG-corrected")
+DFn <- c(anova_mBias_Exp6a$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp6a$ANOVA$DFn[2],
+         anova_mBias_Exp6a$`Sphericity Corrections`$GGe[2] * anova_mBias_Exp6a$ANOVA$DFn[3],
+         anova_mBias_Exp6a$`Sphericity Corrections`$GGe[3] * anova_mBias_Exp6a$ANOVA$DFn[4])
+DFd <- c(anova_mBias_Exp6a$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp6a$ANOVA$DFd[2],
+         anova_mBias_Exp6a$`Sphericity Corrections`$GGe[2] * anova_mBias_Exp6a$ANOVA$DFd[3],
+         anova_mBias_Exp6a$`Sphericity Corrections`$GGe[3] * anova_mBias_Exp6a$ANOVA$DFd[4])
+F <- c(anova_mBias_Exp6a$ANOVA$F[2], anova_mBias_Exp6a$ANOVA$F[3], anova_mBias_Exp6$ANOVA$F[4])
+p <- c(anova_mBias_Exp6a$`Sphericity Corrections`$`p[GG]`[1],
+       anova_mBias_Exp6a$`Sphericity Corrections`$`p[GG]`[2],
+       anova_mBias_Exp6a$`Sphericity Corrections`$`p[GG]`[3])
+partial_eta2 <- c(anova_mBias_Exp6a$ANOVA$partial_eta2[2], anova_mBias_Exp6a$ANOVA$partial_eta2[3],
+                  anova_mBias_Exp6a$ANOVA$partial_eta2[4])
+anova_mBias_Exp6a_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_mBias_Exp6a_GGcr)
+
+# Exp 6b
+mBias_Exp6b_sub <- dplyr::group_by(Data_Exp6 %>% filter(Exp=="Exp. 6b"),
+                                  DurLevel, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), mBias = mean(repDur-curDur))
+mBias_Exp6b_sub$DurLevel <- as.factor(mBias_Exp6b_sub$DurLevel)
+tmp_aov <- ezANOVA(data = mBias_Exp6b_sub, dv= mBias,
+                   wid = NSub, within = c(DurLevel, WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_mBias_Exp6b <- tmp_aov
+print(anova_mBias_Exp6b)
+
+# Greenhouse-Geisser corrections for Exp 6b
+Effect <- c("DurLevel-GG-corrected", "2wayInteract-GG-corrected")
+DFn <- c(anova_mBias_Exp6b$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp6b$ANOVA$DFn[2],
+         anova_mBias_Exp6b$`Sphericity Corrections`$GGe[3] * anova_mBias_Exp6b$ANOVA$DFn[4])
+DFd <- c(anova_mBias_Exp6b$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp6b$ANOVA$DFd[2],
+         anova_mBias_Exp6b$`Sphericity Corrections`$GGe[3] * anova_mBias_Exp6b$ANOVA$DFd[4])
+F <- c(anova_mBias_Exp6b$ANOVA$F[2], anova_mBias_Exp6b$ANOVA$F[4])
+p <- c(anova_mBias_Exp6b$`Sphericity Corrections`$`p[GG]`[1],
+       anova_mBias_Exp6b$`Sphericity Corrections`$`p[GG]`[3])
+partial_eta2 <- c(anova_mBias_Exp6b$ANOVA$partial_eta2[2], anova_mBias_Exp6b$ANOVA$partial_eta2[4])
+anova_mBias_Exp6b_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_mBias_Exp6b_GGcr)
+
+# Exp 6c
+mBias_Exp6c_sub <- dplyr::group_by(Data_Exp6 %>% filter(Exp=="Exp. 6c"),
+                                  DurLevel, NSub, WMFct) %>%
+  dplyr::summarize(n = n(), mBias = mean(repDur-curDur))
+mBias_Exp6c_sub$DurLevel <- as.factor(mBias_Exp6c_sub$DurLevel)
+tmp_aov <- ezANOVA(data = mBias_Exp6c_sub, dv= mBias,
+                   wid = NSub, within = c(DurLevel, WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_mBias_Exp6c <- tmp_aov
+print(anova_mBias_Exp6c)
+
+# Greenhouse-Geisser corrections for Exp 6c
+Effect <- "DurLevel-GG-corrected"
+DFn <- anova_mBias_Exp6c$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp6c$ANOVA$DFn[2]
+DFd <- anova_mBias_Exp6c$`Sphericity Corrections`$GGe[1] * anova_mBias_Exp6c$ANOVA$DFd[2]
+F <- anova_mBias_Exp6c$ANOVA$F[2]
+p <- anova_mBias_Exp6c$`Sphericity Corrections`$`p[GG]`[1]
+partial_eta2 <- anova_mBias_Exp6c$ANOVA$partial_eta2[2]
+anova_mBias_Exp6c_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_mBias_Exp6c_GGcr)
+
+```
+
+# 3. linear fitting for central tendency on reproduction bias
+```{r}
+# linear fitting and estimate slope and indifference point (IP)
+##################################
+
+### linear fitting
+# Exp1
+tmp_lm_wm = Data_Exp1 %>% group_by(WMFct,NSub) %>% do(model = lm(bias ~ curDur, data = .))
+tmp_coef <- tibble()
+for (x in 1:48) {
+  tmp_coef <- bind_rows(tmp_coef, coef(tmp_lm_wm$model[[x]]))
+}
+tmp_coef$ind_pnt = -tmp_coef$`(Intercept)`/tmp_coef$curDur
+
+tmp_SlpIP_sub <- tibble("NSub"=tmp_lm_wm$NSub, "WMFct"=tmp_lm_wm$WMFct, 
+  "slope"=tmp_coef$curDur, "intercept"=tmp_coef$`(Intercept)`, "ind_pnt"=tmp_coef$ind_pnt)
+tmp_SlpIP <- tmp_SlpIP_sub %>% dplyr::group_by(WMFct) %>%
+  dplyr::summarize(n = n(), m_slope = mean(slope), se_slope=sd(slope)/sqrt(n-1),
+                   m_intspt = mean(intercept), m_ip = mean(ind_pnt), se_ip=sd(ind_pnt)/sqrt(n-1))
+# predict reproduction bias
+tmp_pred_bias <- tibble(curDur = mRpr_Exp1$curDur, WMFct = mRpr_Exp1$WMFct)
+tmp_pred_bias <- left_join(tmp_pred_bias, tmp_SlpIP, by = "WMFct")
+tmp_pred_bias$pred_intcpt = -tmp_pred_bias$m_slope * tmp_pred_bias$m_ip
+tmp_pred_bias$pred_y = tmp_pred_bias$curDur * tmp_pred_bias$m_slope + tmp_pred_bias$pred_intcpt
+tb_SlpIP_Exp1 <- tmp_SlpIP
+tb_SlpIP_Exp1_sub <- tmp_SlpIP_sub
+tb_pred_bias_Exp1 <- tmp_pred_bias
+plt_ip_Exp1 <- data.frame(ip_x = tmp_SlpIP$m_ip, ip_y = c(-0.15, -0.25, -0.3))
+
+# Exp2
+tmp_lm_wm = Data_Exp2 %>% group_by(gap,WMFct,NSub) %>% do(model = lm(bias ~ curDur, data = .))
+tmp_coef <- tibble()
+for (x in 1:96) {
+  tmp_coef <- bind_rows(tmp_coef, coef(tmp_lm_wm$model[[x]]))
+}
+tmp_coef$ind_pnt = -tmp_coef$`(Intercept)`/tmp_coef$curDur
+
+tmp_SlpIP_sub <- tibble("NSub"=tmp_lm_wm$NSub, "gap"=tmp_lm_wm$gap, "WMFct"=tmp_lm_wm$WMFct, 
+  "slope"=tmp_coef$curDur, "intercept"=tmp_coef$`(Intercept)`, "ind_pnt"=tmp_coef$ind_pnt)
+tmp_SlpIP <- tmp_SlpIP_sub %>% dplyr::group_by(gap,WMFct) %>%
+  dplyr::summarize(n = n(), m_slope = mean(slope), se_slope=sd(slope)/sqrt(n-1),
+                   m_intspt = mean(intercept), m_ip = mean(ind_pnt), se_ip=sd(ind_pnt)/sqrt(n-1))
+# predict reproduction bias
+tmp_pred_bias <- tibble(curDur = mRpr_Exp2$curDur, gap = mRpr_Exp2$gap, WMFct = mRpr_Exp2$WMFct)
+tmp_pred_bias <- left_join(tmp_pred_bias, tmp_SlpIP, by = c("gap", "WMFct"))
+tmp_pred_bias$pred_intcpt = -tmp_pred_bias$m_slope * tmp_pred_bias$m_ip
+tmp_pred_bias$pred_y = tmp_pred_bias$curDur * tmp_pred_bias$m_slope + tmp_pred_bias$pred_intcpt
+tb_SlpIP_Exp2 <- tmp_SlpIP
+tb_SlpIP_Exp2_sub <- tmp_SlpIP_sub
+tb_pred_bias_Exp2 <- tmp_pred_bias
+plt_ip_Exp2 <- data.frame(gap = tmp_SlpIP$gap, wm = tmp_SlpIP$WMFct,
+                         ip_x = tmp_SlpIP$m_ip, 
+                         ip_y = c(-0.15, -0.25, -0.3, -0.18, -0.28, -0.33))
+
+# Exp3
+# estimate slope and IP
+tmp_lm_wm = Data_Exp3 %>% group_by(WMFct,NSub) %>% do(model = lm(bias ~ curDur, data = .))
+tmp_coef <- tibble()
+for (x in 1:48) {
+  tmp_coef <- bind_rows(tmp_coef, coef(tmp_lm_wm$model[[x]]))
+}
+tmp_coef$ind_pnt = -tmp_coef$`(Intercept)`/tmp_coef$curDur
+
+tmp_SlpIP_sub <- tibble("NSub"=tmp_lm_wm$NSub, "WMFct"=tmp_lm_wm$WMFct, 
+  "slope"=tmp_coef$curDur, "intercept"=tmp_coef$`(Intercept)`, "ind_pnt"=tmp_coef$ind_pnt)
+tmp_SlpIP <- tmp_SlpIP_sub %>% dplyr::group_by(WMFct) %>%
+  dplyr::summarize(n = n(), m_slope = mean(slope), se_slope=sd(slope)/sqrt(n-1),
+                   m_intspt = mean(intercept), m_ip = mean(ind_pnt), se_ip=sd(ind_pnt)/sqrt(n-1))
+# predict reproduction bias
+tmp_pred_bias <- tibble(curDur = mRpr_Exp3$curDur, WMFct = mRpr_Exp3$WMFct)
+tmp_pred_bias <- left_join(tmp_pred_bias, tmp_SlpIP, by = "WMFct")
+tmp_pred_bias$pred_intcpt = -tmp_pred_bias$m_slope * tmp_pred_bias$m_ip
+tmp_pred_bias$pred_y = tmp_pred_bias$curDur * tmp_pred_bias$m_slope + tmp_pred_bias$pred_intcpt
+tb_SlpIP_Exp3 <- tmp_SlpIP
+tb_SlpIP_Exp3_sub <- tmp_SlpIP_sub
+tb_pred_bias_Exp3 <- tmp_pred_bias
+plt_ip_Exp3 <- data.frame(ip_x = tmp_SlpIP$m_ip, ip_y = c(-0.15, -0.25, -0.3))
+
+
+# Exp4
+tmp_lm_wm = Data_Exp4 %>% group_by(WMFct,NSub) %>% do(model = lm(bias ~ curDur, data = .))
+tmp_coef <- tibble()
+for (x in 1:48) {
+  tmp_coef <- bind_rows(tmp_coef, coef(tmp_lm_wm$model[[x]]))
+}
+tmp_coef$ind_pnt = -tmp_coef$`(Intercept)`/tmp_coef$curDur
+
+tmp_SlpIP_sub <- tibble("NSub"=tmp_lm_wm$NSub, "WMFct"=tmp_lm_wm$WMFct, 
+  "slope"=tmp_coef$curDur, "intercept"=tmp_coef$`(Intercept)`, "ind_pnt"=tmp_coef$ind_pnt)
+tmp_SlpIP <- tmp_SlpIP_sub %>% dplyr::group_by(WMFct) %>%
+  dplyr::summarize(n = n(), m_slope = mean(slope), se_slope=sd(slope)/sqrt(n-1),
+                   m_intspt = mean(intercept), m_ip = mean(ind_pnt), se_ip=sd(ind_pnt)/sqrt(n-1))
+# predict reproduction bias
+tmp_pred_bias <- tibble(curDur = mRpr_Exp4$curDur, WMFct = mRpr_Exp4$WMFct)
+tmp_pred_bias <- left_join(tmp_pred_bias, tmp_SlpIP, by = "WMFct")
+tmp_pred_bias$pred_intcpt = -tmp_pred_bias$m_slope * tmp_pred_bias$m_ip
+tmp_pred_bias$pred_y = tmp_pred_bias$curDur * tmp_pred_bias$m_slope + tmp_pred_bias$pred_intcpt
+tb_SlpIP_Exp4 <- tmp_SlpIP
+tb_SlpIP_Exp4_sub <- tmp_SlpIP_sub
+tb_pred_bias_Exp4 <- tmp_pred_bias
+plt_ip_Exp4 <- data.frame(ip_x = tmp_SlpIP$m_ip, ip_y = c(-0.15, -0.25, -0.3))
+
+# Exp5
+tmp_lm_wm = Data_Exp5 %>% group_by(WMFct,NSub) %>% do(model = lm(bias ~ curDur, data = .))
+tmp_coef <- tibble()
+for (x in 1:48) {
+  tmp_coef <- bind_rows(tmp_coef, coef(tmp_lm_wm$model[[x]]))
+}
+tmp_coef$ind_pnt = -tmp_coef$`(Intercept)`/tmp_coef$curDur
+
+tmp_SlpIP_sub <- tibble("NSub"=tmp_lm_wm$NSub, "WMFct"=tmp_lm_wm$WMFct, 
+  "slope"=tmp_coef$curDur, "intercept"=tmp_coef$`(Intercept)`, "ind_pnt"=tmp_coef$ind_pnt)
+tmp_SlpIP <- tmp_SlpIP_sub %>% dplyr::group_by(WMFct) %>%
+  dplyr::summarize(n = n(), m_slope = mean(slope), se_slope=sd(slope)/sqrt(n-1),
+                   m_intspt = mean(intercept), m_ip = mean(ind_pnt), se_ip=sd(ind_pnt)/sqrt(n-1))
+# predict reproduction bias
+tmp_pred_bias <- tibble(curDur = mRpr_Exp5$curDur, WMFct = mRpr_Exp5$WMFct)
+tmp_pred_bias <- left_join(tmp_pred_bias, tmp_SlpIP, by = "WMFct")
+tmp_pred_bias$pred_intcpt = -tmp_pred_bias$m_slope * tmp_pred_bias$m_ip
+tmp_pred_bias$pred_y = tmp_pred_bias$curDur * tmp_pred_bias$m_slope + tmp_pred_bias$pred_intcpt
+tb_SlpIP_Exp5 <- tmp_SlpIP
+tb_SlpIP_Exp5_sub <- tmp_SlpIP_sub
+tb_pred_bias_Exp5 <- tmp_pred_bias
+plt_ip_Exp5 <- data.frame(ip_x = tmp_SlpIP$m_ip, ip_y = c(-0.15, -0.25, -0.3))
+
+# Exp6
+tmp_lm_wm = Data_Exp6 %>% group_by(Exp,WMFct,NSub) %>% do(model = lm(bias ~ curDur, data = .))
+tmp_coef <- tibble()
+for (x in 1:162) {
+  tmp_coef <- bind_rows(tmp_coef, coef(tmp_lm_wm$model[[x]]))
+}
+tmp_coef$ind_pnt = -tmp_coef$`(Intercept)`/tmp_coef$curDur
+
+tmp_SlpIP_sub <- tibble("NSub"=tmp_lm_wm$NSub, "exp"=tmp_lm_wm$Exp, "WMFct"=tmp_lm_wm$WMFct, 
+  "slope"=tmp_coef$curDur, "intercept"=tmp_coef$`(Intercept)`, "ind_pnt"=tmp_coef$ind_pnt)
+tmp_SlpIP <- tmp_SlpIP_sub %>% dplyr::group_by(exp,WMFct) %>%
+  dplyr::summarize(n = n(), m_slope = mean(slope), se_slope=sd(slope)/sqrt(n-1),
+                   m_intspt = mean(intercept), m_ip = mean(ind_pnt), se_ip=sd(ind_pnt)/sqrt(n-1))
+# predict reproduction bias
+tmp_pred_bias <- tibble(exp = mRpr_Exp6$Exp, curDur = mRpr_Exp6$curDur, WMFct = mRpr_Exp6$WMFct)
+tmp_pred_bias <- left_join(tmp_pred_bias, tmp_SlpIP, by = c("exp", "WMFct"))
+tmp_pred_bias$pred_intcpt = -tmp_pred_bias$m_slope * tmp_pred_bias$m_ip
+tmp_pred_bias$pred_y = tmp_pred_bias$curDur * tmp_pred_bias$m_slope + tmp_pred_bias$pred_intcpt
+tb_SlpIP_Exp6 <- tmp_SlpIP
+tb_SlpIP_Exp6_sub <- tmp_SlpIP_sub
+tb_pred_bias_Exp6 <- tmp_pred_bias
+plt_ip_Exp6 <- data.frame(exp = tmp_SlpIP$exp, wm = tmp_SlpIP$WMFct, ip_x = tmp_SlpIP$m_ip)
+plt_ip_Exp6 <- do.call("rbind", replicate(2, plt_ip_Exp6, simplify = FALSE))
+plt_ip_Exp6$ip_y = c(-0.15, -0.25, -0.3, -0.15, -0.25, -0.3, -0.15, -0.25, -0.3, 
+                     0,0,0,0,0,0,0,0,0)
+
+```
+
+```{r}
+# plot estimated slope (bar)
+##################################
+
+# Exp 1
+plt_bar_SlpIP_Exp1 <- ggplot(tb_SlpIP_Exp1, aes(x=WMFct,y=m_slope)) +
+  geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
+  geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
+                width=.1,  position = position_dodge()) +
+  geom_signif(annotations=c("**","**"), tip_length = -0.1, vjust=2.5,
+              y_position = c(-0.63,-0.63), xmin = c(1, 2.1), xmax = c(1.9, 3),
+              color = 'black') +
+  coord_cartesian(ylim = c(-0.7, 0)) +
+  labs(x="Memory Load", y="Estimated slope", title="Reproduction bias slope") + 
+  theme_new + theme(legend.position = "bottom", legend.justification = c("center", "top"),
+                    plot.title = element_text(hjust = 0.5))
+plt_bar_SlpIP_Exp1
+
+# Exp 2
+plt_bar_SlpIP_Exp2 <- ggplot(tb_SlpIP_Exp2, aes(x=gap,y=m_slope,
+                                               group=interaction(WMFct, gap))) +
+  geom_bar(stat="identity", aes(fill=WMFct), position=position_dodge()) +
+  geom_errorbar(aes(x=gap, ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
+                width=.1,  position = position_dodge(.9)) +
+  geom_signif(annotations=c("*","**"), 
+              tip_length = -0.1, vjust=2.5,
+              y_position = c(-0.6, -0.7), 
+              xmin = c(1.7, 1.7), 
+              xmax = c(1.95, 2.3),
+              color = 'black') +
+  coord_cartesian(ylim = c(-0.85, 0)) +
+  labs(x="Gap", y="Estimated slope", fill="Memory Load", 
+       title="Reproduction bias slope") + 
+  theme_new + fillGreySet3 + 
+  theme(legend.position = "bottom",
+        plot.title = element_text(hjust = 0.5))
+plt_bar_SlpIP_Exp2
+
+# Exp 3
+plt_bar_SlpIP_Exp3 <- ggplot(tb_SlpIP_Exp3, aes(x=WMFct,y=m_slope)) +
+  geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
+  geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
+                width=.1,  position = position_dodge()) +
+  geom_signif(annotations=c("***"), tip_length = -0.1, vjust=2.5,
+              y_position = c(-0.73), xmin = c(1), xmax = c(1.9),
+              color = 'black') +
+  coord_cartesian(ylim = c(-0.85, 0)) +
+  labs(x="Memory Load", y="Estimated slope", title="Reproduction bias slope") + 
+  theme_new + theme(legend.position = "bottom", legend.justification = c("center", "top"),
+                    plot.title = element_text(hjust = 0.5))
+plt_bar_SlpIP_Exp3
+
+# Exp 4
+plt_bar_SlpIP_Exp4 <- ggplot(tb_SlpIP_Exp4, aes(x=WMFct,y=m_slope)) +
+  geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
+  geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
+                width=.1,  position = position_dodge()) +
+  coord_cartesian(ylim = c(-0.75, 0)) +
+  labs(x="Memory Load", y="Estimated slope", title="Reproduction bias slope") + 
+  theme_new + theme(legend.position = "bottom", legend.justification = c("center", "top"),
+                    plot.title = element_text(hjust = 0.5))
+plt_bar_SlpIP_Exp4
+
+# Exp 5
+plt_bar_SlpIP_Exp5 <- ggplot(tb_SlpIP_Exp5, aes(x=WMFct,y=m_slope)) +
+  geom_bar(stat="identity", fill="lightgrey", position=position_dodge()) +
+  geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
+                width=.1,  position = position_dodge()) +
+  coord_cartesian(ylim = c(-0.65, 0)) +
+  labs(x="Memory Load", y="Estimated slope", title="Reproduction bias slope") + 
+  theme_new + theme(legend.position = "bottom", legend.justification = c("center", "top"),
+                    plot.title = element_text(hjust = 0.5))
+plt_bar_SlpIP_Exp5
+
+# Exp 6
+plt_bar_SlpIP_Exp6 <- ggplot(tb_SlpIP_Exp6, aes(x=exp,y=m_slope,
+                                               group=interaction(WMFct, exp))) +
+  geom_bar(stat="identity", aes(fill=WMFct), position=position_dodge()) +
+  geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), 
+                width=.1,  position = position_dodge(.9)) +
+  geom_signif(annotations=c("**","***"),
+              tip_length = -0.1, vjust=2.5,
+              y_position = c(-0.48, -0.56),
+              xmin = c(0.7, 0.7),
+              xmax = c(0.95, 1.3),
+              color = 'black') +
+  coord_cartesian(ylim = c(-0.65, 0)) +
+  labs(x="Experiment", y="Estimated slope", fill="Memory Load", 
+       title="Reproduction bias slope") + 
+  theme_new + fillGreySet3 + 
+  theme(legend.position = "bottom", 
+        plot.title = element_text(hjust = 0.5))
+plt_bar_SlpIP_Exp6
+
+```
+
+
+```{r}
+# ANOVA on linear-fitted slope
+##################################
+# Exp 1
+tmp_aov <- ezANOVA(data = tb_SlpIP_Exp1_sub, dv= slope,
+                   wid = NSub, within = .(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_slope_Exp1 <- tmp_aov
+print(anova_slope_Exp1)
+
+# Summary statistics of the slope by groups (WMFct)
+Exp1_slope_by_wm <- tb_SlpIP_Exp1_sub %>% 
+  group_by(WMFct) %>% get_summary_stats(slope, type="mean_se")
+print(Exp1_slope_by_wm)
+
+# Exp 2
+tmp_aov <- ezANOVA(data = tb_SlpIP_Exp2_sub, dv= slope,
+                   wid = NSub, within = c(WMFct, gap), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_slope_Exp2 <- tmp_aov
+print(anova_slope_Exp2)
+
+# Exp 3
+tmp_aov <- ezANOVA(data = tb_SlpIP_Exp3_sub, dv= slope,
+                   wid = NSub, within = .(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_slope_Exp3 <- tmp_aov
+print(anova_slope_Exp3)
+
+# Summary statistics of the slope by groups (WMFct)
+Exp3_slope_by_wm <- tb_SlpIP_Exp3_sub %>% 
+  group_by(WMFct) %>% get_summary_stats(slope, type="mean_se")
+print(Exp3_slope_by_wm)
+
+# Exp 4
+tmp_aov <- ezANOVA(data = tb_SlpIP_Exp4_sub, dv= slope,
+                   wid = NSub, within = .(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_slope_Exp4 <- tmp_aov
+print(anova_slope_Exp4)
+
+# Exp 5
+tmp_aov <- ezANOVA(data = tb_SlpIP_Exp5_sub, dv= slope,
+                   wid = NSub, within = .(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_slope_Exp5 <- tmp_aov
+print(anova_slope_Exp5)
+
+# Summary statistics of the slope by groups (WMFct)
+Exp5_slope_by_wm <- tb_SlpIP_Exp5_sub %>% 
+  group_by(WMFct) %>% get_summary_stats(slope, type="mean_se")
+print(Exp5_slope_by_wm)
+
+# Exp 6
+tmp_aov <- ezANOVA(data = tb_SlpIP_Exp6_sub, dv= slope,
+                   wid = NSub, within = c(WMFct, exp), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_slope_Exp6 <- tmp_aov
+print(anova_slope_Exp6)
+
+# Exp 6a
+tmp_aov <- ezANOVA(data = tb_SlpIP_Exp6_sub %>% filter(exp=="Exp. 6a"), dv= slope,
+                   wid = NSub, within = c(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_slope_Exp6a <- tmp_aov
+print(anova_slope_Exp6a)
+
+# Exp 6b
+tmp_aov <- ezANOVA(data = tb_SlpIP_Exp6_sub %>% filter(exp=="Exp. 6b"), dv= slope,
+                   wid = NSub, within = c(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_slope_Exp6b <- tmp_aov
+print(anova_slope_Exp6b)
+
+# Greenhouse-Geisser corrections for Exp 6b
+Effect <- "WMFct-GG-corrected"
+DFn <- anova_slope_Exp6b$`Sphericity Corrections`$GGe * anova_slope_Exp6b$ANOVA$DFn[2]
+DFd <- anova_slope_Exp6b$`Sphericity Corrections`$GGe * anova_slope_Exp6b$ANOVA$DFd[2]
+F <- anova_slope_Exp6b$ANOVA$F[2]
+p <- anova_slope_Exp6b$`Sphericity Corrections`$`p[GG]`
+partial_eta2 <- anova_slope_Exp6b$ANOVA$partial_eta2[2]
+anova_slope_Exp6b_GGcr <- data.frame(Effect, DFn, DFd, F, p, partial_eta2)
+print(anova_slope_Exp6b_GGcr)
+
+# Exp 6c
+tmp_aov <- ezANOVA(data = tb_SlpIP_Exp6_sub %>% filter(exp=="Exp. 6c"), dv= slope,
+                   wid = NSub, within = c(WMFct), detailed=TRUE)
+tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+anova_slope_Exp6c <- tmp_aov
+print(anova_slope_Exp6c)
+
+```
+
+
 
