@@ -1,13 +1,14 @@
 ---
-  title: "Duration reproduction under memory pressure"
+title: "Duration reproduction under memory pressure"
 author: "Strongway, Jiao Wu et al."
 date: "2024-09-10"
 description: "Statistical Analyses"
-output: html_document:
-  df_print: paged
-number_sections: true
-pdf_document: 
-  number_sections: true
+output:
+  pdf_document: 
+    number_sections: true
+  html_document:
+    df_print: paged
+    number_sections: true
 latex_engine: xelatex
 ---
 
@@ -313,3 +314,86 @@ av3 = mBias %>% filter(ExpName == 'Both_gap') %>% mutate(gap = as.factor(gap)) %
   ezANOVA(dv = ms_bias, wid = NSub, within = .(Load, gap), detailed = TRUE)
 print(av3$ANOVA)
 ```
+
+# 5. working memory on encoding 2 (within-subject design)
+
+```{r encoding2, message=FALSE, warning=FALSE}
+# encoding manipulation
+fig_encoding2 = plot_fig('Encoding2')
+fig_encoding2
+```
+Now rmANOVA on reproduction biases, CTI and general biases
+
+```{r rmANOVA_encoding2, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Encoding2') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(curDur, Load), detailed = TRUE)
+print(av1$ANOVA)
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Encoding2') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE)
+print(av2$ANOVA)
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Encoding2') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE)
+print(av3$ANOVA)
+```
+Post hoc pairwise t-test on general bias
+```{r posthoc_encoding2, message=FALSE, warning=FALSE}
+mBias %>% filter(ExpName == 'Encoding2')  -> mBias_rp
+pairwise.t.test(x = mBias_rp$ms_bias, g = mBias_rp$Load, paired = TRUE, p.adjust.method = 'holm')
+```
+Post hoc pariwise t-test on cti
+```{r posthoc_encoding2_cti, message=FALSE, warning=FALSE}
+mRep_cti %>% filter(ExpName == 'Encoding2')  -> mRep_cti_rp
+pairwise.t.test(x = mRep_cti_rp$cti, g = mRep_cti_rp$Load, paired = TRUE, p.adjust.method = 'holm')
+```
+
+# 6. working memory on reproduction 2 (within-subject design)
+
+```{r reproduction2, message=FALSE, warning=FALSE}
+# reproduction manipulation
+fig_reproduction2 = plot_fig('Reproduction2')
+fig_reproduction2
+```
+Now rmANOVA on reproduction biases, CTI and general biases
+
+```{r rmANOVA_reproduction2, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Reproduction2') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(curDur, Load), detailed = TRUE)
+print(av1$ANOVA)
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Reproduction2') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE)
+print(av2$ANOVA)
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Reproduction2') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE)
+print(av3$ANOVA)
+```
+Results showed only the main effect of Duration. Memory loads were marginal...
+
+# 7. working memory on baseline 2 (within-subject design)
+```{r baseline2, message=FALSE, warning=FALSE}
+# baseline manipulation
+fig_baseline2 = plot_fig('baseline2')
+fig_baseline2
+```
+Now rmANOVA on reproduction biases, CTI and general biases
+```{r rmANOVA_baseline2, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'baseline2') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(curDur, Load), detailed = TRUE)
+print(av1$ANOVA)
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'baseline2') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE)
+print(av2$ANOVA)
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'baseline2') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE)
+print(av3$ANOVA)
+```
+Only the main effect of Duration was significant.
+
