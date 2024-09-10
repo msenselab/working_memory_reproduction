@@ -145,4 +145,3 @@ tab_model(mod4b, digits = 3)
 
 
 
-

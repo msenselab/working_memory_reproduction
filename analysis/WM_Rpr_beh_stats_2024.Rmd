@@ -1,0 +1,315 @@
+---
+  title: "Duration reproduction under memory pressure"
+author: "Strongway, Jiao Wu et al."
+date: "2024-09-10"
+description: "Statistical Analyses"
+output: html_document:
+  df_print: paged
+number_sections: true
+pdf_document: 
+  number_sections: true
+latex_engine: xelatex
+---
+
+# Load packages and functions and data
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+library(ez)
+library(tidyverse)
+library(lme4)
+library(rstatix)
+library(ggpubr)
+library(lmerTest)
+library(sjPlot)
+library(cowplot)
+source('mytheme.R')
+
+ExpData = read.csv(paste0("../data/AllValidData.csv"))
+ExpData6 <- read.csv(paste0("../data/Exp6.csv")) %>% filter(valid == 1)
+
+# add meaningful name for each experiment based on Exp number
+ExpData = ExpData %>% mutate(ExpName = case_when(Exp == "Exp1" ~ 'Baseline',
+                                                        Exp == "Exp2" ~ 'Encoding',
+                                                        Exp == "Exp3" ~ 'Reproduction',
+                                                        Exp == "Exp4" ~ 'Both',
+                                                        Exp == "Exp5" ~ 'Both_gap'))
+ExpData6 = ExpData6 %>% mutate(ExpName = case_when(Exp == "Exp. 6a" ~ 'Encoding2',
+                                                        Exp == "Exp. 6b" ~ 'Reproduction2',
+                                                        Exp == "Exp. 6c" ~ 'baseline2'),
+                               gap = 1)
+
+# concatenate two datasets
+ExpData = bind_rows(ExpData, ExpData6)
+
+# add working memory responses
+ExpData$WMCrr <- ExpData$TPresent == ExpData$WMRP
+# add reproduction error (bias)
+ExpData$bias <- ExpData$repDur - ExpData$curDur
+
+# map WMSize to a new column Load: 1 - low, 2 - medium, 3 - high
+ExpData$Load = factor(ExpData$WMSize, levels = c(1, 3, 5), labels = c('Low', 'Medium', 'High'))
+
+```
+
+## mean reproduction biases and working memory performance
+
+Calculate mean reproduction biases and working memory performance for each experiment. 
+
+```{r meandata, message=FALSE, warning=FALSE}
+# mean reproduction biases
+mRep = ExpData %>% group_by(ExpName, NSub, WMSize, Load, gap, curDur) %>% 
+  summarise(m_bias = mean(bias), se_bias = sd(bias)/sqrt(n()), n = n()) 
+
+# general bias
+mBias = mRep %>% group_by(ExpName, Load, gap, NSub) %>% 
+  summarise(ms_bias = mean(m_bias)*1000, se_bias = sd(m_bias)/sqrt(n())*1000)
+
+# mean working memory performance
+mWM = ExpData %>% group_by(ExpName, NSub, WMSize,gap, Load) %>% 
+  summarise(m_WMCrr = mean(WMCrr), se_WMCrr = sd(WMCrr)/sqrt(n()), n = n())
+
+
+```
+
+## Central tendency effect
+
+Next, we estimate the central tendency effect by using linear regression. First, we prepare several useful functions
+
+```{r functions, message=FALSE, warning=FALSE}
+
+# a simple linear model function
+lm_model <- function(df) {
+  lm(m_bias ~ curDur, data = df)
+}
+
+# obtain the estimates of the linear model
+lm_estimate <- function(df) {
+  df %>% group_by(ExpName, NSub, gap, Load) %>% nest() %>% 
+  mutate(lm = map(data, lm_model)) %>% # linear regression
+  mutate(slope = map(lm, broom::tidy)) %>%  # get estimates
+  unnest(slope) %>% # remove raw data
+  dplyr::select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns
+  spread(term, estimate) %>%   # spread stimates
+  dplyr::rename(Intercept = `(Intercept)`, slope = curDur) %>% # rename columns
+  mutate(cti = -slope) # central tendency index
+}
+
+# now estimate the central tendency effect
+mRep_cti = mRep %>% lm_estimate()
+
+```
+
+## Plotting functions
+
+```{r plotfunction, message=FALSE, warning=FALSE}
+
+#plot reproduction bias by duration and memory load (central tendency effect) based on mRep
+plot_cti <- function(data){
+  # from subject-level to group-level
+  data %>% group_by(Load, curDur) %>% summarise(mm_bias = mean(m_bias), se_bias = sd(m_bias)/sqrt(n())) %>%
+  ggplot(aes(curDur, mm_bias,  color = Load, shape = Load)) + 
+    geom_point(size = 2, stat = 'identity') + geom_line() + 
+    geom_errorbar(aes(ymin = mm_bias - se_bias, ymax = mm_bias + se_bias), width = 0.05) +
+    coord_cartesian(ylim = c(-0.5, 0.5)) +
+    scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+    labs(x="Durations (s)", y="Reproduction bias (s)", 
+       shape ="Memory Load", color = "Memory Load") +
+    theme_new + greySet3 +   theme(legend.position = c(.7,.8), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5))
+}
+
+# plot mean biases by memory load based on mBias
+plot_bias_Load <- function(data){
+  data %>% group_by(Load) %>% summarise(bias = mean(ms_bias), se_bias = sd(ms_bias)/sqrt(n())) %>%
+  ggplot(aes(Load, bias, fill = Load)) + 
+    geom_bar(stat = 'identity', width = 0.75) + 
+    geom_errorbar(aes(ymin = bias - se_bias, ymax = bias + se_bias, color = Load), width = 0.3) +
+    scale_y_reverse() + 
+    labs(x="Memory Load", y="Mean Underestimate (ms)", fill = "Memory Load", color = 'Memory Load') +
+    theme_new + fillGreySet3 + greySet3 + theme(legend.position = "none", 
+        plot.title = element_text(hjust = 0.5))
+}
+
+# plot mean cti by memory load
+plot_cti_Load <-function(data){
+  data %>% group_by(Load) %>% summarise(m_cti = mean(cti), se_cti = sd(cti)/sqrt(n())) %>%
+    ggplot(aes(Load, m_cti, fill = Load)) + 
+    geom_bar(stat = 'identity', width = 0.75) + 
+    geom_errorbar(aes(ymin = m_cti - se_cti, ymax = m_cti + se_cti, color = Load), width = 0.3) +
+    labs(x="Memory Load", y="Central Tendency Index", fill = "Memory Load", color = "Memory Load") +
+    theme_new + fillGreySet3 + greySet3 + theme(legend.position = "none", 
+        plot.title = element_text(hjust = 0.5))
+}
+
+# output three figures together
+plot_fig <- function(Name, subfig = FALSE) {
+  fig_a = mRep %>% filter(ExpName == Name) %>% plot_cti()
+  fig_b = mRep_cti %>% filter(ExpName == Name) %>% plot_cti_Load()
+  fig_c = mBias %>% filter(ExpName == Name) %>% plot_bias_Load()
+  if(subfig) {
+    return(list(fig_a=fig_a, fig_b=fig_b, fig_c=fig_c))
+  } else {
+    plot_grid(fig_a, fig_b, fig_c, labels = c('a', 'b', 'c'), nrow = 1)
+  }
+}
+```
+
+
+## 1. Working memory impacts on the encoding phase
+
+```{r plotfigs, message=FALSE, warning=FALSE}
+# encoding manipulation
+fig_encoding = plot_fig('Encoding', subfig = TRUE)
+fig_encoding$fig_b = fig_encoding$fig_b + 
+  geom_signif(y_position = c(0.7, 0.75), xmin = c(1,2), xmax = c(2, 3), annotation = c("***", "***")) + ylim(0, 0.8)
+fig_en = plot_grid(fig_encoding$fig_a, fig_encoding$fig_b, fig_encoding$fig_c, labels = c('a', 'b', 'c'), nrow = 1)
+# save figures
+ggsave("./figures/fig_encoding.png", fig_en, width = 7, height = 3)
+fig_en
+```
+Now rmANOVA on reproduction biases, CTI and general biases
+
+```{r rmANOVA_encoding, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(curDur, Load), detailed = TRUE)
+print(av1$ANOVA)
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE)
+print(av2$ANOVA)
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE)
+print(av3$ANOVA)
+```
+```{r}
+mWM %>% filter(ExpName == 'Encoding') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+mWM %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE)
+```
+
+## 2. Working memory impacts on the reproduction phase
+
+
+```{r plotfigs2, message=FALSE, warning=FALSE}
+# reproduction manipulation
+fig_reproduction = plot_fig('Reproduction', subfig = TRUE)
+fig_reproduction$fig_c = fig_reproduction$fig_c + 
+  geom_signif(y_position = c(120, 130), xmin = c(1,1), xmax = c(2, 3), annotation = c("*", "***")) + ylim(-150,0) +  scale_y_reverse() 
+
+fig_rp = plot_grid(fig_reproduction$fig_a, fig_reproduction$fig_b, fig_reproduction$fig_c, labels = c('a', 'b', 'c'), nrow = 1)
+# save figures
+ggsave("./figures/fig_reproduction.png", fig_rp, width = 7, height = 3)
+fig_rp
+
+```
+
+Now rmANOVA on reproduction biases, CTI and general biases
+
+```{r rmANOVA_reproduction, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Reproduction') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(curDur, Load), detailed = TRUE)
+print(av1$ANOVA)
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Reproduction') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE)
+print(av2$ANOVA)
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Reproduction') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE)
+print(av3$ANOVA)
+```
+```{r}
+# given the significant of memory load on general bias, we further conduct post hoc pairwise t-test
+mBias %>% filter(ExpName == 'Reproduction')  -> mBias_rp
+pairwise.t.test(x = mBias_rp$ms_bias, g = mBias_rp$Load, paired = TRUE, p.adjust.method = 'holm')
+
+```
+## 3. Working memory on both encoding and reproduction phases
+
+```{r plotfigs3, message=FALSE, warning=FALSE}
+# both manipulation
+fig_both = plot_fig('Both', subfig = TRUE)
+fig_both$fig_b = fig_both$fig_b + 
+  geom_signif(y_position = c(0.6, 0.65), xmin = c(1,2), xmax = c(2, 3), annotation = c("**", "**")) + ylim(0, 0.7)
+fig_both$fig_c = fig_both$fig_c + 
+  geom_signif(y_position = c(120, 130), xmin = c(1,1), xmax = c(2, 3), annotation = c("*", "*")) + ylim(-150,0) +  scale_y_reverse()
+
+fig_bt = plot_grid(fig_both$fig_a, fig_both$fig_b, fig_both$fig_c, labels = c('a', 'b', 'c'), nrow = 1)
+# save figures
+ggsave("./figures/fig_both.png", fig_bt, width = 7, height = 3)
+fig_bt
+```
+ANOVAs on reproduction biases, CTI and general biases
+
+```{r rmANOVA_both, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Both') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(curDur, Load), detailed = TRUE)
+print(av1$ANOVA)
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Both') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE)
+print(av2$ANOVA)
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Both') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE)
+print(av3$ANOVA)
+```
+Post hoc pairwise t-test on general bias
+```{r posthoc_both, message=FALSE, warning=FALSE}
+mBias %>% filter(ExpName == 'Both')  -> mBias_bt
+pairwise.t.test(x = mBias_bt$ms_bias, g = mBias_bt$Load, paired = TRUE, p.adjust.method = 'holm')
+```
+Post hoc pairwise t-test on cti
+```{r posthoc_both_cti, message=FALSE, warning=FALSE}
+mRep_cti %>% filter(ExpName == 'Both')  -> mRep_cti_bt
+pairwise.t.test(x = mRep_cti_bt$cti, g = mRep_cti_bt$Load, paired = TRUE, p.adjust.method = 'holm')
+```
+## 4. Working memory on both encoding and reproduction phases with gap
+
+```{r plotfigs4, message=FALSE, warning=FALSE}
+# both manipulation with gap
+fig_a = mRep %>% filter(ExpName == 'Both_gap', gap == 1) %>% plot_cti() + #add text 'Short Gap' on the left top
+  geom_text(aes(x = 0.8, y = 0.5, label = 'Short Gap'), size = 3, color = 'black') +
+  theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank(), legend.position = c(.7,.7)) 
+fig_b = mRep_cti %>% filter(ExpName == 'Both_gap', gap == 1) %>% plot_cti_Load() +   
+  theme(axis.title.x=element_blank(), axis.text.x=element_blank(), axis.ticks.x=element_blank()) 
+fig_c = mBias %>% filter(ExpName == 'Both_gap', gap == 1) %>% plot_bias_Load() 
+
+
+fig_a2 = mRep %>% filter(ExpName == 'Both_gap', gap == 2) %>% plot_cti() + # remove legend
+    geom_text(aes(x = 0.8, y = 0.5, label = 'Long Gap'), size = 3, color = 'black') +
+  theme(legend.position = "none")
+fig_b2 = mRep_cti %>% filter(ExpName == 'Both_gap', gap == 2) %>% plot_cti_Load() 
+fig_c2 = mBias %>% filter(ExpName == 'Both_gap', gap == 2) %>% plot_bias_Load() 
+
+# combine figures
+fig_gap = plot_grid(fig_a, fig_b, fig_c, fig_a2, fig_b2, fig_c2, labels = c('a', 'b', 'c', 'd', 'e', 'f'), nrow = 2)
+# save figure
+ggsave("./figures/fig_gap.png", fig_gap, width = 7, height = 6)
+fig_gap
+
+```
+ANOVAs on reproduction biases, CTI and general biases
+
+```{r rmANOVA_gap, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Both_gap') %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = m_bias, wid = NSub, within = .(curDur, Load, gap), detailed = TRUE)
+print(av1$ANOVA)
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Both_gap') %>%mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = cti, wid = NSub, within = .(Load, gap), detailed = TRUE)
+print(av2$ANOVA)
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Both_gap') %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = ms_bias, wid = NSub, within = .(Load, gap), detailed = TRUE)
+print(av3$ANOVA)
+```

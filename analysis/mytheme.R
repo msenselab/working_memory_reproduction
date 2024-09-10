@@ -4,7 +4,7 @@ colorSet4 <- scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9", "#1a96
 colorSet <- scale_color_manual(values=c("#d7191c", "#fdae61", "#a6d96a", "#1a9641")) 
 colorSet5 <- scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9", "#1a9641", "#d7191c")) 
 fillSet3 <- scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9"))
-fillGreySet3 <- scale_fill_manual(values=c("#c3c3c3", "#a3a3a3", "#838383"))
+fillGreySet3 <- scale_fill_manual(values=c("lightgrey", "#838383", "#3b3b3b"))
 greySet3 <- scale_color_manual(values=c("lightgrey", "#838383", "#3b3b3b"))
 
 #customize theme

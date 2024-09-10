@@ -923,6 +923,34 @@ plt_bar_SlpIP_Exp6 <- ggplot(tb_SlpIP_Exp6, aes(x=exp,y=m_slope,
 plt_bar_SlpIP_Exp6
 
 ```
+```{r}
+# caclulate average bias for each WMSize from mRpr_Exp1_sub
+mBias_Exp1 = mRpr_Exp1_sub %>% group_by(WMSize) %>% 
+  summarize(m_bias = mean(mBias)*1000, seBias = sd(mBias)/sqrt(n())*1000)
+mBias_Exp1
+mSlope_Exp1 = tb_SlpIP_Exp1_sub %>% group_by(WMSize) %>% 
+  summarize(m_slope = mean(slope), se_slope = sd(slope)/sqrt(n()))
+mSlope_Exp1
+# left join mBias and mSlope
+mBiasSlope_Exp1 = left_join(mBias_Exp1, mSlope_Exp1, by = "WMSize")
+# factor WMSize as low, medium, and high
+mBiasSlope_Exp1$WMSize <- factor(mBiasSlope_Exp1$WMSize, levels = c(1,3,5), labels=c("low", "medium", "high"))
+```
+```{r}
+# plot bias and slope as 2D dot with SE, separate for each WMSize
+plt_biasSlope_Exp1 <- ggplot(mBiasSlope_Exp1, aes(x=m_bias, y=m_slope, color = WMSize)) +
+  geom_point(size=3) +
+  geom_text(aes(label=WMSize), hjust=-0.2, vjust=-0.2) +
+  geom_errorbar(aes(ymin=m_slope-se_slope, ymax=m_slope+se_slope), width = 0 ) +
+  geom_errorbarh(aes(xmin=m_bias-seBias, xmax=m_bias+seBias)) +
+  labs(x="Reproduction bias (ms)", y="Reproduction bias slope") +
+  theme_new + colorSet3 + theme(legend.position = "none")
+plt_biasSlope_Exp1
+
+# save figure
+ggsave(paste0(getwd(), "/figures/plt_biasSlope_Exp1.png"), plt_biasSlope_Exp1, width = 5, height = 5)
+
+```
 
 ```{r}
 # plot estimated slope and IP
