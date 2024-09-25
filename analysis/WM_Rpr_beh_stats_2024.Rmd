@@ -275,6 +275,7 @@ calParEta2 <- function(tmp_aov){
   tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
   return(tmp_aov)
 }
+
 ```
 
 # 1. Working memory impacts on the encoding phase
@@ -302,22 +303,26 @@ av1 = mRep %>% filter(ExpName == 'Encoding') %>%
   calParEta2()
 print(av1)
 print(GGcr(av1))
+
 #rmANOVA on cti
 av2 = mRep_cti %>% filter(ExpName == 'Encoding') %>% 
   ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av2)
+
 #rmANOVA on general bias
 av3 = mBias %>% filter(ExpName == 'Encoding') %>% 
   ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av3)
+
 # rmANOVA on cv
 av4 = mRep %>% filter(ExpName == 'Encoding') %>% 
   ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
   calParEta2()
 print(av4)
 print(GGcr(av4))
+
 ```
 
 ```{r}
@@ -328,6 +333,7 @@ pairwise.t.test(x = cti_encd$cti, g = cti_encd$Load, paired = TRUE, p.adjust.met
 ```
 
 ```{r}
+# rmANOVA on working memory task accuracy
 mWM %>% filter(ExpName == 'Encoding') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
 mWM %>% filter(ExpName == 'Encoding') %>% 
   ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
@@ -362,16 +368,19 @@ av1 = mRep %>% filter(ExpName == 'Reproduction') %>%
   calParEta2()
 print(av1)
 print(GGcr(av1))
+
 #rmANOVA on cti
 av2 = mRep_cti %>% filter(ExpName == 'Reproduction') %>% 
   ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av2)
+
 #rmANOVA on general bias
 av3 = mBias %>% filter(ExpName == 'Reproduction') %>% 
   ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av3)
+
 # rmANOVA on cv
 av4 = mRep %>% filter(ExpName == 'Reproduction') %>% 
   ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
@@ -388,19 +397,19 @@ pairwise.t.test(x = mBias_rp$ms_bias, g = mBias_rp$Load, paired = TRUE, p.adjust
 ```
 
 ```{r}
+# rmANOVA on working memory task accuracy
 mWM %>% filter(ExpName == 'Reproduction') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
 mWM %>% filter(ExpName == 'Reproduction') %>% 
   ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2() -> avm
 print(avm)
-```
 
-Post hoc pairwise t-test on WM accuracy
-
-```{r posthoc_both_cti, message=FALSE, warning=FALSE}
+# Post hoc pairwise t-test on WM accuracy
 mWM %>% filter(ExpName == 'Reproduction')  -> mWM_rp
 pairwise.t.test(x = mWM_rp$m_WMCrr, g = mWM_rp$Load, paired = TRUE, p.adjust.method = 'holm')
+
 ```
+
 
 # 3. working memory after duration task (baseline: no memory load)
 
@@ -426,16 +435,19 @@ av1 = mRep %>% filter(ExpName == 'Baseline') %>%
   calParEta2()
 print(av1)
 print(GGcr(av1))
+
 #rmANOVA on cti
 av2 = mRep_cti %>% filter(ExpName == 'Baseline') %>% 
   ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av2)
+
 #rmANOVA on general bias
 av3 = mBias %>% filter(ExpName == 'Baseline') %>% 
   ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av3)
+
 # rmANOVA on cv
 av4 = mRep %>% filter(ExpName == 'Baseline') %>% 
   ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
@@ -444,25 +456,26 @@ print(av4)
 ```
 
 ```{r}
+# mean CTI values
 mRep_cti %>% filter(ExpName == 'Baseline') %>% group_by(Load) %>% summarise(mean(cti), sd(cti)/sqrt(n()))
 
 ```
 
 ```{r}
+# rmANOVA on working memory task accuracy
 mWM %>% filter(ExpName == 'Baseline') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
 mWM %>% filter(ExpName == 'Baseline') %>% 
   ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2() -> avm
 print(avm)
 print(GGcr(avm))
-```
 
-Post hoc pairwise t-test on WM accuracy
-
-```{r posthoc_both_cti, message=FALSE, warning=FALSE}
+# Post hoc pairwise t-test on WM accuracy
 mWM %>% filter(ExpName == 'Baseline')  -> mWM_bl
 pairwise.t.test(x = mWM_bl$m_WMCrr, g = mWM_bl$Load, paired = TRUE, p.adjust.method = 'holm')
+
 ```
+
 
 # 4. Working memory on both encoding and reproduction phases
 ```{r plotfigs3, message=FALSE, warning=FALSE}
@@ -493,51 +506,121 @@ av1 = mRep %>% filter(ExpName == 'Both') %>%
   calParEta2()
 print(av1)
 print(GGcr(av1))
+
 #rmANOVA on cti
 av2 = mRep_cti %>% filter(ExpName == 'Both') %>% 
   ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av2)
+
 #rmANOVA on general bias
 av3 = mBias %>% filter(ExpName == 'Both') %>% 
   ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av3)
+
 # rmANOVA on cv 
 av4 = mRep %>% filter(ExpName == 'Both') %>% 
   ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
   calParEta2()
 print(av4)
 print(GGcr(av4))
+
 ```
 
-Post hoc pairwise t-test on general bias
 
 ```{r posthoc_both, message=FALSE, warning=FALSE}
+# Post hoc pairwise t-test on general bias
 mBias %>% filter(ExpName == 'Both') %>% group_by(Load) %>% summarise(mean(ms_bias), sd(ms_bias)/sqrt(n()))
-
 mBias %>% filter(ExpName == 'Both')  -> mBias_bt
 pairwise.t.test(x = mBias_bt$ms_bias, g = mBias_bt$Load, paired = TRUE, p.adjust.method = 'holm')
-```
 
-Post hoc pairwise t-test on cti
-
-```{r posthoc_both_cti, message=FALSE, warning=FALSE}
+# Post hoc pairwise t-test on cti
 mRep_cti %>% filter(ExpName == 'Both')  -> mRep_cti_bt
 pairwise.t.test(x = mRep_cti_bt$cti, g = mRep_cti_bt$Load, paired = TRUE, p.adjust.method = 'holm')
+
 ```
 
+
 ```{r}
+# ANOVA on working memory accuracy
 mWM %>% filter(ExpName == 'Both') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
 mWM %>% filter(ExpName == 'Both') %>% 
   ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2() -> avm
 print(avm)
-```
 
-```{r posthoc_both_cti, message=FALSE, warning=FALSE}
+# post hoc pairwise t-test on WM accuracy
 mWM %>% filter(ExpName == 'Both')  -> mWM_both
 pairwise.t.test(x = mWM_both$m_WMCrr, g = mWM_both$Load, paired = TRUE, p.adjust.method = 'holm')
+
+```
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+# Previously, it observed a reduction of central tendency at high load. To further
+# explore if this is a general fashion or driven by certain outliers, here plot 
+# reproduction bias, CTI, and WM accuracy performance for each participant.
+bias_exp4_par <- mRep %>% filter(ExpName=='Both') %>%
+  group_by(curDur,Load,NSub) %>% summarise(mBias=mean(m_bias))
+fig_exp4_par <- ggplot(data=bias_exp4_par, aes(curDur,mBias,color=Load)) + 
+  geom_point() + geom_line() +
+  facet_wrap(~NSub) +
+  theme_new
+fig_exp4_par
+
+cti_exp4_par <- mRep_cti %>% filter(ExpName == 'Both') %>%
+  group_by(Load,NSub) %>% summarise(mCTI=mean(cti))
+fig2_exp4_par <- ggplot(data=cti_exp4_par, aes(Load,mCTI)) + 
+  geom_bar(stat = 'identity', width = 0.75) + 
+  facet_wrap(~NSub) +
+  theme_new
+fig2_exp4_par
+
+mwm_exp4_par <- mWM %>% filter(ExpName=='Both') %>% 
+  group_by(WMSize,NSub) %>% summarise(mWM=mean(m_WMCrr))
+fig3_exp4_par <- ggplot() + 
+  geom_bar(data=cti_exp4_par, aes(Load,mCTI),stat='identity',width=0.75) + 
+  geom_line(data=mwm_exp4_par, aes(WMSize,mWM)) +
+  geom_point(size = 2, stat = 'identity') + 
+  facet_wrap(~NSub) +
+  theme_new
+fig3_exp4_par
+
+```
+
+# [*1] cross-experiment analysis and figures
+
+## cross-Exp. (Exp1-4) analysis on working memory accuracy
+```{r posthoc_both_cti, message=FALSE, warning=FALSE}
+# combined accuracy data from Exp1-4
+mWM %>% filter(ExpName=='Encoding' | ExpName=='Reproduction'|
+                         ExpName=='Baseline'| ExpName=='Both') %>% 
+  group_by(ExpName, Load) -> wmCrsExp
+
+# ANOVA
+wmCrsExp %>% mutate(ExpName = as.factor(ExpName)) %>%
+  ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, between=ExpName, detailed = TRUE) %>%
+  calParEta2() -> avmCrsExp
+print(avmCrsExp)
+
+# post hoc tests
+pairwise.t.test(x = wmCrsExp$m_WMCrr, g = wmCrsExp$ExpName, paired = TRUE, p.adjust.method = 'holm')
+pairwise.t.test(x = wmCrsExp$m_WMCrr, g = wmCrsExp$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# mean accuracy values for each exp.
+mWM %>% filter(ExpName=='Encoding' | ExpName=='Reproduction'| 
+                 ExpName=='Baseline'| ExpName=='Both') %>%
+  group_by(ExpName) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+
+# save mean accuracy data for each participant
+mWMCrsExpLongTab = 
+  subset(mWM %>% filter(ExpName=='Encoding' | ExpName=='Reproduction'|
+                        ExpName=='Baseline'| ExpName=='Both'), 
+               select=c(ExpName, Load, NSub, m_WMCrr)) %>% 
+    pivot_wider(names_from = c("Load"), 
+                values_from = c(m_WMCrr), names_sep="_")
+#write.csv(mWMCrsExpLongTab,paste0(getwd(),"/bhvrlt/mWMCrsExpLongTab.csv"))
+
 ```
 
 ## plot mean and cv of bias for Exps 1-4
@@ -589,6 +672,7 @@ fig_4e
 ggsave("./figures/fig2_Exp1to4.png", fig_4e, width = 7, height = 5)
 
 ```
+
 
 # 5. Working memory on both encoding and reproduction phases with gap
 
@@ -765,18 +849,6 @@ print(av4_long)
 print(GGcr(av4_long))
 ```
 
-```{r}
-mWM %>% filter(ExpName == 'Both_gap') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
-mWM %>% filter(ExpName == 'Both_gap') %>% mutate(gap = as.factor(gap)) %>%
-  ezANOVA(dv = m_WMCrr, wid = NSub, within = .(Load, gap), detailed = TRUE) %>%
-  calParEta2() -> avm
-print(avm)
-```
-
-```{r posthoc_both_cti, message=FALSE, warning=FALSE}
-mWM %>% filter(ExpName == 'Both_gap')  -> mWM_both_gap
-pairwise.t.test(x = mWM_both_gap$m_WMCrr, g = mWM_both_gap$Load, paired = TRUE, p.adjust.method = 'holm')
-```
 
 Post hoc pairwise t-test on cti
 
@@ -796,12 +868,16 @@ mRep_cti %>% filter(ExpName == 'Both_gap') %>% group_by(gap) %>%
   summarise(m_cti = mean(cti), se_cti = sd(cti)/sqrt(n()), n = n()) 
 ```
 
+
 Post hoc pairwise t-test on mean bias
 
 ```{r posthoc_both_meanBias, message=FALSE, warning=FALSE}
 # load effect of mean bias on short and long gap
 mBias %>% filter(ExpName == 'Both_gap', gap==1)  -> mRep_mb_gap1
 pairwise.t.test(x = mRep_mb_gap1$ms_bias, g = mRep_mb_gap1$Load, paired = TRUE, p.adjust.method = 'holm')
+
+mRep_mb_gap1 %>% group_by(Load) %>% 
+  summarise(msBias = mean(ms_bias), seBias = sd(ms_bias)/sqrt(n()), n = n())
 
 mBias %>% filter(ExpName == 'Both_gap', gap==2)  -> mRep_mb_gap2
 pairwise.t.test(x = mRep_mb_gap2$ms_bias, g = mRep_mb_gap2$Load, paired = TRUE, p.adjust.method = 'holm')
@@ -830,9 +906,164 @@ mRep %>% filter(ExpName == 'Both_gap') %>% group_by(NSub,gap) %>%
 pairwise.t.test(x = mcv_gap$m_cv, g = mcv_gap$gap, paired = TRUE, p.adjust.method = 'holm')
 ```
 
+
+```{r}
+# ANOVA on WM accuracy
+mWM %>% filter(ExpName == 'Both_gap') %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = m_WMCrr, wid = NSub, within = .(Load, gap), detailed = TRUE) %>%
+  calParEta2() -> avm
+print(avm)
+
+# post hoc pairwise t-test
+mWM %>% filter(ExpName == 'Both_gap')  -> mWM_both_gap
+pairwise.t.test(x = mWM_both_gap$m_WMCrr, g = mWM_both_gap$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# mean accuracy values
+mWM %>% filter(ExpName == 'Both_gap') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+mWM %>% filter(ExpName == 'Both_gap') %>% group_by(gap) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+
+```
+
+
+# [*2] cross-experiment analysis and figures
+
+## cross-exp. (Exp 4 vs 5) analysis of WM accuracy
+```{r}
+# Effect of Experiment (4 vs 5)
+mWM_exp45 <- mWM %>% filter(ExpName == 'Both_gap' | ExpName == 'Both')
+mWM_exp45 %>% group_by(ExpName) %>% summarise(mWMs=mean(m_WMCrr), seWMs=sd(m_WMCrr)/sqrt(n()))
+mWM_exp45 %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = m_WMCrr, wid = NSub, between=ExpName, detailed = TRUE) %>%
+  calParEta2() -> anv_exp45
+print(anv_exp45)
+
+# Effect of Experiment (4 vs 5_short_gap)
+mWM_exp45 %>% group_by(ExpName,gap) %>% summarise(mWMs=mean(m_WMCrr), seWMs=sd(m_WMCrr)/sqrt(n()))
+mWM_exp45 %>% filter(gap==1) %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = m_WMCrr, wid = NSub, between=ExpName, detailed = TRUE) %>%
+  calParEta2() -> anv_exp45_gap
+print(anv_exp45_gap)
+
+```
+
+## cross-exp. (Exp1-6) plots of WM accuracy
+```{r}
+# visualize the WM accuracy for Exps1-4
+mWM_exps1 <- mWM %>% 
+  filter(ExpName=='Encoding'|ExpName=='Reproduction'|
+           ExpName=='Both'|ExpName=='Baseline') %>% 
+  group_by(ExpName,WMSize,gap) %>%
+  summarise(mnWM=mean(m_WMCrr), seWM=sd(m_WMCrr)/sqrt(n()),n=n())
+fig_wm1 <- ggplot(data=mWM_exps1, aes(WMSize,mnWM,color=ExpName)) + geom_point() + geom_line() +
+  geom_errorbar(aes(ymin=mnWM-seWM, ymax=mnWM+seWM), width=0.1) + 
+  coord_cartesian(ylim = c(0.55, 0.95)) +
+  theme_new + theme(legend.position = c(.8,.8))
+fig_wm1
+
+# visualize the WM accuracy for Exp4 vs 5
+mWM_exps2 <- mWM %>% 
+  filter(ExpName=='Both'|ExpName=='Both_gap') %>% mutate(gap = as.factor(gap)) %>%
+  group_by(ExpName,WMSize,gap) %>%
+  summarise(mnWM=mean(m_WMCrr), seWM=sd(m_WMCrr)/sqrt(n()),n=n())
+fig_wm2 <- ggplot(data=mWM_exps2, aes(WMSize,mnWM,color=ExpName,linetype=gap)) + geom_point() + 
+  geom_line() + geom_errorbar(aes(ymin=mnWM-seWM, ymax=mnWM+seWM), width=0.1) +
+  coord_cartesian(ylim = c(0.55, 0.95)) +
+  theme_new + theme(legend.position = c(.8,.8))
+fig_wm2
+
+# visualize the WM accuracy for Exp6a-c
+mWM_exps3 <- mWM %>% 
+  filter(ExpName=='Encoding2'|ExpName=='Reproduction2'|
+           ExpName=='baseline2') %>% 
+  group_by(ExpName,WMSize) %>%
+  summarise(mnWM=mean(m_WMCrr), seWM=sd(m_WMCrr)/sqrt(n()),n=n())
+fig_wm3 <- ggplot(data=mWM_exps3, aes(WMSize,mnWM,color=ExpName)) + geom_point() + geom_line() +
+  geom_errorbar(aes(ymin=mnWM-seWM, ymax=mnWM+seWM), width=0.1) +
+  coord_cartesian(ylim = c(0.55, 0.95)) +
+  theme_new + theme(legend.position = c(.8,.8))
+fig_wm3
+
+fig_wmExps = ggarrange(fig_wm1, fig_wm2, fig_wm3, labels=c('a','b','c'),
+                       ncol=3, nrow = 1)
+fig_wmExps
+#ggsave("./figures/fig_wm_allExps.png", fig_wmExps, width = 10, height = 5)
+
+```
+
+## cross-exp. (Exp1-4 & 5_short_gap) analysis on CV
+```{r}
+# anova across Exp. 1-4 and 5 (only short gap)
+cv_crsExp <- mRep %>% filter(ExpName=='Encoding' | ExpName=='Reproduction'|
+                              ExpName=='Baseline'| ExpName=='Both' |
+                              ExpName == 'Both_gap', gap != 2)
+av_cv_crsExp <- cv_crsExp %>%
+  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), 
+          between=ExpName, detailed = TRUE) %>%
+  calParEta2()
+print(av_cv_crsExp$ANOVA)
+print(GGcr(av_cv_crsExp))
+
+# post hoc pairwise t-test
+cv_crsExp %>% group_by(NSub,Load,ExpName) %>% 
+  summarise(m_cv = mean(cv), n = n()) -> mcv_crsExp
+pairwise.t.test(x = mcv_crsExp$m_cv, g = mcv_crsExp$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# mean CV values
+cv_crsExp %>% group_by(Load) %>% summarise(mean(cv), sd(cv)/sqrt(n()))
+
+```
+
+## cross-Exp. (1,4,5 -- all loaded-on-encoding exps) analysis on CTI
+```{r}
+# anova across Exp. 1, 4 and 5
+cti_crsExp <- mRep_cti %>% filter(ExpName=='Encoding' | ExpName=='Both' |
+                              ExpName == 'Both_gap')
+av_cti_crsExp <- cti_crsExp %>%
+  ezANOVA(dv = cti, wid = NSub, within = Load, between=ExpName, detailed = TRUE) %>%
+  calParEta2()
+print(av_cti_crsExp)
+print(GGcr(av_cti_crsExp))
+
+# post hoc pairwise t-test
+cti_crsExp %>% group_by(NSub,Load,ExpName) %>% 
+  summarise(m_cti = mean(cti), n = n()) -> mcti_crsExp
+pairwise.t.test(x = mcti_crsExp$m_cti, g = mcti_crsExp$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# mean CTI values
+cti_crsExp %>% group_by(Load) %>% summarise(mean(cti), sd(cti)/sqrt(n()))
+
+# save CTI for each participant
+mCTICrsExpLongTab = 
+  subset(cti_crsExp, select=c(ExpName, NSub, Load, cti)) %>% 
+  group_by(ExpName,NSub,Load) %>% 
+  summarise(m_cti = mean(cti), n = n()) %>% 
+  pivot_wider(names_from = c("Load"), values_from = c(m_cti), names_sep="_")
+#write.csv(mCTICrsExpLongTab,paste0(getwd(),"/bhvrlt/mCTICrsExpLongTab.csv"))
+
+```
+
+
+## cross-Exp. (Exp 2 & 6b -- both loaded-on-reproduction exps) analysis on mean Bias 
+```{r}
+# ANOVA on mean Bias
+mB_Rpr <- mBias %>% filter(ExpName == 'Reproduction' | ExpName=='Reproduction2')
+av_crsExp = mB_Rpr %>% ezANOVA(dv = ms_bias, wid = NSub, within = Load,
+          between=ExpName, detailed = TRUE) %>% calParEta2()
+print(av_crsExp)
+print(GGcr(av_crsExp))
+
+# plot mean Bias from Exp 2 & 6b together
+fig_reproduction2 = plot_fig('Reproduction2', subfig = TRUE)
+fig_allRpr = plot_grid(fig_reproduction$fig_c, fig_reproduction2$fig_c, 
+                   labels = c('a', 'b'))
+fig_allRpr
+
+```
+
 # 6. working memory on encoding, reproduction and baseline (controlling gap)
 
 ```{r plot_exp6abc, message=FALSE, warning=FALSE}
+# plot Exp 6a, 6b and 6c together
 # manipulation with encoding, reproduction and baseline in sub-experiments 6a-c
 ExpName.labs <- c("Exp. 6a (Encoding)","Exp. 6b (Reproduction)",
                   "Exp. 6c (Baseline)")
@@ -922,13 +1153,12 @@ av1 = mRep %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName==
 print(av1)
 print(GGcr(av1))
 
-# rmANOVA on cv 
-av4 = mRep %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
-  mutate(ExpName = as.factor(ExpName)) %>%
-  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load, ExpName), detailed = TRUE) %>%
+
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
-print(av4)
-print(GGcr(av4))
+print(av2)
 
 #rmANOVA on general bias
 av3 = mBias %>% filter(ExpName == 'Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
@@ -936,6 +1166,14 @@ av3 = mBias %>% filter(ExpName == 'Encoding2' | ExpName=='Reproduction2'| ExpNam
   calParEta2()
 print(av3)
 print(GGcr(av3))
+
+# rmANOVA on cv 
+av4 = mRep %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
+  mutate(ExpName = as.factor(ExpName)) %>%
+  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load, ExpName), detailed = TRUE) %>%
+  calParEta2()
+print(av4)
+print(GGcr(av4))
 
 ```
 
@@ -950,10 +1188,12 @@ pairwise.t.test(x = mRep_cti_6$m_cti, g = mRep_cti_6$ExpName, paired = TRUE, p.a
 Post hoc pariwise t-test on general bias
 
 ```{r posthoc_exp6_cti, message=FALSE, warning=FALSE}
+# pairwise t-test
 mBias %>% filter(ExpName=='Encoding2' |ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
   group_by(NSub,Load,ExpName) %>% summarise(mBias = mean(ms_bias), n = n()) -> mRep_gBias_6
 pairwise.t.test(x = mRep_gBias_6$mBias, g = mRep_gBias_6$Load, paired = TRUE, p.adjust.method = 'holm')
 
+# independent t-test on each condition
 gBias_6 <- mRep_gBias_6 %>% pivot_wider(names_from = c("Load","ExpName"), 
                                         values_from = c(mBias), names_sep="_")
 list <- colnames(gBias_6)
@@ -965,18 +1205,23 @@ for (effect in list[3:11]) {
 ```
 
 ```{r}
-mWM %>% filter(ExpName=='Encoding2'|ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
-  group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
-
+# ANOVA on WM accuracy
 mWM %>% filter(ExpName=='Encoding2'|ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
   ezANOVA(dv = m_WMCrr, wid = NSub, within = .(Load, ExpName), detailed = TRUE) %>%
   calParEta2() -> avm2
 print(avm2)
 
-mWM %>% filter(ExpName=='Encoding2'|ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
-  group_by(ExpName) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+# post hoc pairwise t-test
 mWM %>% filter(ExpName=='Encoding2'|ExpName=='Reproduction2'|ExpName=='baseline2') -> mWM6
 pairwise.t.test(x = mWM6$m_WMCrr, g = mWM6$ExpName, paired = TRUE, p.adjust.method = 'holm')
+
+# mean WM accuracy values
+mWM %>% filter(ExpName=='Encoding2'|ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
+  group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+
+mWM %>% filter(ExpName=='Encoding2'|ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
+  group_by(ExpName) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+
 ```
 
 # 6a. working memory on encoding 2 (within-subject design)
@@ -999,6 +1244,7 @@ fig_6a = plot_grid(fig_encoding2$fig_a, fig_encoding2$fig_b, fig_encoding2$fig_c
 fig_6a
 # save figure
 ggsave("./figures/fig_6a_encoding2.png", fig_6a, width = 7, height = 5)
+
 ```
 
 Now rmANOVA on reproduction biases, CTI and general biases
@@ -1010,17 +1256,20 @@ av1 = mRep %>% filter(ExpName == 'Encoding2') %>%
   calParEta2()
 print(av1)
 print(GGcr(av1))
+
 #rmANOVA on cti
 av2 = mRep_cti %>% filter(ExpName == 'Encoding2') %>% 
   ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av2)
+
 #rmANOVA on general bias
 av3 = mBias %>% filter(ExpName == 'Encoding2') %>% 
   ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av3)
 print(GGcr(av3))
+
 # rmANOVA on cv
 av4 = mRep %>% filter(ExpName == 'Encoding2') %>% 
   ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
@@ -1045,12 +1294,17 @@ pairwise.t.test(x = mRep_cti_rp$cti, g = mRep_cti_rp$Load, paired = TRUE, p.adju
 ```
 
 ```{r}
-mWM %>% filter(ExpName == 'Encoding2') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+# ANOVA on WM accuracy
 mWM %>% filter(ExpName == 'Encoding2') %>% 
   ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2() -> avm
 print(avm)
 print(GGcr(avm))
+
+# mean accuracy values
+mWM %>% filter(ExpName == 'Encoding2') %>% group_by(Load) %>% 
+  summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+
 ```
 
 # 6b. working memory on reproduction 2 (within-subject design)
@@ -1071,6 +1325,7 @@ fig_6b = plot_grid(fig_reproduction2$fig_a, fig_reproduction2$fig_b,
 fig_6b
 # save figure
 ggsave("./figures/fig_6b_reproduction2.png", fig_6b, width = 7, height = 5)
+
 ```
 
 Now rmANOVA on reproduction biases, CTI and general biases
@@ -1082,34 +1337,43 @@ av1 = mRep %>% filter(ExpName == 'Reproduction2') %>%
   calParEta2()
 print(av1)
 print(GGcr(av1))
+
 #rmANOVA on cti
 av2 = mRep_cti %>% filter(ExpName == 'Reproduction2') %>% 
   ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av2)
 print(GGcr(av2))
+
 #rmANOVA on general bias
 av3 = mBias %>% filter(ExpName == 'Reproduction2') %>% 
   ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av3)
+
 #rmANOVA on cv
 av4 = mRep %>% filter(ExpName == 'Reproduction2') %>% 
   ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
   calParEta2()
 print(av4)
 print(GGcr(av4))
+
 ```
 
 Results showed only the main effect of Duration. Memory loads were marginal...
 
 ```{r}
-mWM %>% filter(ExpName == 'Reproduction2') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+# ANOVA on WM accuracy
 mWM %>% filter(ExpName == 'Reproduction2') %>% 
   ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2() -> avm
 print(avm)
 print(GGcr(avm))
+
+# mean accuracy values
+mWM %>% filter(ExpName == 'Reproduction2') %>% group_by(Load) %>% 
+  summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+
 ```
 
 # 6c. working memory on baseline 2 (within-subject design)
@@ -1127,6 +1391,7 @@ fig_6c = plot_grid(fig_baseline2$fig_a, fig_baseline2$fig_b,
 fig_6c
 # save figure
 ggsave("./figures/fig_6c_baseline2.png", fig_6c, width = 7, height = 5)
+
 ```
 
 Now rmANOVA on reproduction biases, CTI and general biases
@@ -1138,31 +1403,56 @@ av1 = mRep %>% filter(ExpName == 'baseline2') %>%
   calParEta2()
 print(av1)
 print(GGcr(av1))
+
 #rmANOVA on cti
 av2 = mRep_cti %>% filter(ExpName == 'baseline2') %>% 
   ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av2)
+
 #rmANOVA on general bias
 av3 = mBias %>% filter(ExpName == 'baseline2') %>% 
   ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2()
 print(av3)
+
 #rmANOVA on cv
 av4 = mRep %>% filter(ExpName == 'baseline2') %>% 
   ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
   calParEta2()
 print(av4)
 print(GGcr(av4))
+
 ```
 
 Only the main effect of Duration was significant.
 
 ```{r}
-mWM %>% filter(ExpName == 'baseline2') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+# ANOVA on WM accuracy
 mWM %>% filter(ExpName == 'baseline2') %>% 
   ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
   calParEta2() -> avm
 print(avm)
 print(GGcr(avm))
+
+# mean accuracy values
+mWM %>% filter(ExpName == 'baseline2') %>% group_by(Load) %>% 
+  summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
