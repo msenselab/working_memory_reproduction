@@ -1099,8 +1099,8 @@ fig_b6 = tmp2 %>% group_by(Load, ExpName2) %>%
   geom_errorbar(aes(ymin = m_cti - se_cti, ymax = m_cti + se_cti, 
                     color = Load), width = 0.3, position = position_dodge(.8)) +
   coord_cartesian(ylim = c(0.1, 0.8)) +
-  geom_signif(y_position = c(0.55,0.65), xmin = c(0.74,0.74), 
-              xmax = c(1,1.26), annotation = c("**","**")) +
+  geom_signif(y_position = c(0.55,0.65,0.75), xmin = c(0.74,0.74,1), 
+              xmax = c(1,1.26,3), annotation = c("**","**","*")) +
   scale_x_discrete(labels=c('Exp. 6a', 'Exp. 6b', 'Exp. 6c')) +
   labs(x="", y="CTI", fill = "Memory Load", color = "Memory Load") +
   theme_new + fillGreySet3 + greySet3 + theme(legend.position = c(0.85, 0.85), 
@@ -1143,16 +1143,17 @@ ggsave("./figures/fig_6_compact.png", fig_exp6, width = 7, height = 5)
 
 ```
 
+
 ```{r}
 # analysis on Exp 6
 # rmANOVA on mean Bias
 av1 = mRep %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
   mutate(ExpName = as.factor(ExpName)) %>%
-  ezANOVA(dv = m_bias, wid = NSub, within = .(DurLevel, Load, ExpName), detailed = TRUE) %>%
+  ezANOVA(dv = m_bias, wid = NSub, within = .(DurLevel, Load, ExpName), 
+          detailed = TRUE) %>%
   calParEta2()
 print(av1)
 print(GGcr(av1))
-
 
 #rmANOVA on cti
 av2 = mRep_cti %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
@@ -1177,15 +1178,148 @@ print(GGcr(av4))
 
 ```
 
-Post hoc pariwise t-test on cti
 
-```{r posthoc_exp6_cti, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE}
+# two-way ANOVA on Memory Load and sub-Experiment
+
+# rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = .(Load,ExpName), detailed = TRUE) %>%
+  calParEta2()
+print(av2)
+
+# Post hoc pairwise t-test on cti by Memory load
 mRep_cti %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
-  group_by(NSub,ExpName) %>% summarise(m_cti = mean(cti), n = n()) -> mRep_cti_6
-pairwise.t.test(x = mRep_cti_6$m_cti, g = mRep_cti_6$ExpName, paired = TRUE, p.adjust.method = 'holm')
+  group_by(NSub,Load) %>% summarise(m_cti = mean(cti), n = n()) -> mRep_cti_6load
+pairwise.t.test(x = mRep_cti_6load$m_cti, g = mRep_cti_6load$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# cti values by Memory load
+mRep_cti %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
+  group_by(Load) %>% summarise(m_cti = mean(cti), se_cti = sd(cti)/sqrt(n()), n = n())
+
+# Post hoc pairwise t-test on cti by Exps
+mRep_cti %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
+  group_by(NSub,ExpName) %>% summarise(m_cti = mean(cti), n = n()) -> mRep_cti_6exps
+pairwise.t.test(x = mRep_cti_6exps$m_cti, g = mRep_cti_6exps$ExpName, paired = TRUE, p.adjust.method = 'holm')
+
+
+# rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = .(Load,ExpName), detailed = TRUE) %>%
+  calParEta2()
+print(av3)
+print(GGcr(av3))
+
+# Post hoc pairwise t-test on mean bias
+mBias %>% filter(ExpName=='Encoding2' |ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
+  group_by(NSub,Load) %>% summarise(mBias = mean(ms_bias), n = n()) -> mRep_mBias_6
+pairwise.t.test(x = mRep_mBias_6$mBias, g = mRep_gBias_6$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# mean bias values
+mBias %>% filter(ExpName=='Encoding2' |ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
+  group_by(Load) %>% summarise(mBias = mean(ms_bias), seBias=sd(ms_bias)/sqrt(n()), n = n())
+
+
 ```
 
-Post hoc pariwise t-test on general bias
+comparison of mean CTI between Exp. 6a and 6c
+
+```{r exp6a_vs_6c, message=FALSE, warning=FALSE}
+# rmANOVA on cti: 6a vs 6c
+mRep_cti_6ac <- mRep_cti %>% filter(ExpName=='Encoding2' | ExpName=='baseline2')
+
+av_6ac = mRep_cti_6ac %>% 
+  ezANOVA(dv = cti, wid = NSub, within = .(Load,ExpName), detailed = TRUE) %>%
+  calParEta2()
+print(av_6ac)
+
+# Post hoc pairwise t-test on cti by Loads
+mRep_cti_6ac %>% group_by(NSub,Load) %>% 
+  summarise(m_cti = mean(cti), n = n()) -> cti_6ac_load
+pairwise.t.test(x = cti_6ac_load$m_cti, g = cti_6ac_load$Load, 
+                paired = TRUE, p.adjust.method = 'holm')
+
+# mean cti values by Memory load
+mRep_cti_6ac %>% group_by(Load) %>% 
+  summarise(m_cti = mean(cti), se_cti = sd(cti)/sqrt(n()), n = n())
+
+# Post hoc pairwise t-test on cti by Exp
+mRep_cti_6ac %>% group_by(NSub,ExpName) %>% 
+  summarise(m_cti = mean(cti), n = n()) -> cti_6ac_exp
+pairwise.t.test(x = cti_6ac_exp$m_cti, g = cti_6ac_exp$ExpName, 
+                paired = TRUE, p.adjust.method = 'holm')
+
+# mean cti values by Exp
+mRep_cti_6ac %>% group_by(ExpName) %>% 
+  summarise(m_cti = mean(cti), se_cti = sd(cti)/sqrt(n()), n = n())
+
+# save CTI for each participant
+mctiExp6acLongTab = 
+  subset(mRep_cti_6ac, select=c(ExpName, NSub, Load, cti)) %>% 
+  group_by(ExpName,NSub,Load) %>% 
+  summarise(m_cti = mean(cti), n = n()) %>% 
+  pivot_wider(names_from = c("ExpName","Load"), values_from = c(m_cti), names_sep="_")
+#write.csv(mctiExp6acLongTab,paste0(getwd(),"/bhvrlt/mctiExp6acLongTab.csv"))
+
+```
+
+comparison of mean CTI between Exp. 6b and 6c
+
+```{r exp6a_vs_6c, message=FALSE, warning=FALSE}
+# rmANOVA on cti: 6b vs 6c
+av_6bc = mRep_cti %>% filter(ExpName=='Reproduction2' | ExpName=='baseline2') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = .(Load,ExpName), detailed = TRUE) %>%
+  calParEta2()
+print(av_6bc)
+print(GGcr(av_6bc))
+
+```
+
+
+comparison of general bias between Exp. 6a and 6c
+
+```{r exp6b_vs_6c, message=FALSE, warning=FALSE}
+# rmANOVA on general bias: 6a vs 6c
+mBias_6ac <- mBias %>% filter(ExpName == 'Encoding2' | ExpName=='baseline2')
+av_mB6ac = mBias_6ac %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = .(Load,ExpName), detailed = TRUE) %>%
+  calParEta2()
+print(av_mB6ac)
+print(GGcr(av_mB6ac))
+
+# Post hoc pairwise t-test on cti by Loads
+mBias_6ac %>% group_by(NSub,Load) %>% summarise(m_bias = mean(ms_bias), n = n()) -> mB_6ac_load
+pairwise.t.test(x = mB_6ac_load$m_bias, g = mB_6ac_load$Load, 
+                paired = TRUE, p.adjust.method = 'holm')
+
+mBias_6ac %>% group_by(Load) %>% 
+  summarise(m_bias = mean(ms_bias), se_bias = sd(ms_bias)/sqrt(n()), n = n())
+
+```
+
+
+comparison of general bias between Exp. 6b and 6c
+
+```{r exp6b_vs_6c, message=FALSE, warning=FALSE}
+# rmANOVA on general bias: 6a vs 6c
+mBias_6bc <- mBias %>% filter(ExpName == 'Reproduction2' | ExpName=='baseline2')
+av_mB6bc = mBias_6bc %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = .(Load,ExpName), detailed = TRUE) %>%
+  calParEta2()
+print(av_mB6bc)
+print(GGcr(av_mB6bc))
+
+# Post hoc pairwise t-test on cti by Loads
+mBias_6bc %>% group_by(NSub,Load) %>% summarise(m_bias = mean(ms_bias), n = n()) -> mB_6bc_load
+pairwise.t.test(x = mB_6bc_load$m_bias, g = mB_6bc_load$Load, 
+                paired = TRUE, p.adjust.method = 'holm')
+
+mBias_6bc %>% group_by(Load) %>% 
+  summarise(m_bias = mean(ms_bias), se_bias = sd(ms_bias)/sqrt(n()), n = n())
+
+```
+
+Post hoc pairwise t-test on general bias
 
 ```{r posthoc_exp6_cti, message=FALSE, warning=FALSE}
 # pairwise t-test
@@ -1202,7 +1336,24 @@ for (effect in list[3:11]) {
   print(paste(effect, '---------', rst$p.value))
 }
 
+
 ```
+
+Post hoc pairwise t-test on CV
+
+```{r exp6_cv, message=FALSE, warning=FALSE}
+# pairwise t-test
+mRep %>% filter(ExpName=='Encoding2' |ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
+  group_by(NSub,ExpName) %>% summarise(mcv = mean(cv), n = n()) -> mRep_mcv_6
+pairwise.t.test(x = mRep_mcv_6$mcv, g = mRep_mcv_6$ExpName, paired = TRUE, p.adjust.method = 'holm')
+
+```
+
+
+
+
+
+
 
 ```{r}
 # ANOVA on WM accuracy
@@ -1223,6 +1374,8 @@ mWM %>% filter(ExpName=='Encoding2'|ExpName=='Reproduction2'|ExpName=='baseline2
   group_by(ExpName) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
 
 ```
+
+
 
 # 6a. working memory on encoding 2 (within-subject design)
 
