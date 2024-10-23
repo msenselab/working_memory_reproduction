@@ -216,7 +216,7 @@ plot_bias_Load <- function(data){
     geom_bar(stat = 'identity', width = 0.75) + 
     geom_errorbar(aes(ymin = bias - se_bias, ymax = bias + se_bias, color = Load), width = 0.3) +
     scale_y_reverse() + coord_cartesian(ylim = c(-20, -180)) +
-    labs(x="Memory Load", y="Mean Biase (ms)", fill = "Memory Load", color = 'Memory Load') +
+    labs(x="Memory Load", y="Mean Bias (ms)", fill = "Memory Load", color = 'Memory Load') +
     theme_new + fillGreySet3 + greySet3 + theme(legend.position = "none", 
         plot.title = element_text(hjust = 0.5))
 }
@@ -604,7 +604,7 @@ wmCrsExp %>% mutate(ExpName = as.factor(ExpName)) %>%
 print(avmCrsExp)
 
 # post hoc tests
-pairwise.t.test(x = wmCrsExp$m_WMCrr, g = wmCrsExp$ExpName, paired = TRUE, p.adjust.method = 'holm')
+pairwise.t.test(x = wmCrsExp$m_WMCrr, g = wmCrsExp$ExpName, paired = FALSE, p.adjust.method = 'holm')
 pairwise.t.test(x = wmCrsExp$m_WMCrr, g = wmCrsExp$Load, paired = TRUE, p.adjust.method = 'holm')
 
 # mean accuracy values for each exp.
@@ -671,6 +671,41 @@ fig_4e
 # save figure
 ggsave("./figures/fig2_Exp1to4.png", fig_4e, width = 7, height = 5)
 
+```
+
+## compare CTI of Exps 1 & 4
+```{r, message=FALSE, warning=FALSE}
+# combined CTI from Exp1 & 4
+mRep_cti %>% filter(ExpName=='Encoding'| ExpName=='Both') %>% 
+  group_by(ExpName, Load) -> ctiCrsExp
+
+ctiCrsExp %>% mutate(ExpName = as.factor(ExpName)) %>%
+  ezANOVA(dv = cti, wid = NSub, within = Load, between=ExpName, detailed = TRUE) %>%
+  calParEta2() -> avCtiCrsExp
+print(avCtiCrsExp)
+
+# post hoc tests
+pairwise.t.test(x = ctiCrsExp$cti, g = ctiCrsExp$ExpName, paired = FALSE, p.adjust.method = 'holm')
+pairwise.t.test(x = ctiCrsExp$cti, g = ctiCrsExp$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# mean accuracy values for each exp.
+mRep_cti %>% filter(ExpName=='Encoding' | ExpName=='Both') %>%
+  group_by(ExpName) %>% summarise(mean(cti), sd(cti)/sqrt(n()))
+
+
+# save cti for each participant
+mCtiCrsExpLongTab = 
+  subset(mRep_cti %>% filter(ExpName=='Encoding'| ExpName=='Both'), 
+               select=c(ExpName, Load, NSub, cti)) %>% 
+    pivot_wider(names_from = c("Load"), 
+                values_from = c(cti), names_sep="_")
+# write.csv(mCtiCrsExpLongTab,paste0(getwd(),"/bhvrlt/mCtiCrsExpLongTab.csv"))
+
+# combine figures
+fig_4b = ggarrange(fig_encoding$fig_b, fig_both$fig_b, 
+                   labels=c('a','b','c','d'), 
+                   nrow = 1, common.legend = TRUE, legend = c("top"))
+fig_4b
 ```
 
 
@@ -776,7 +811,7 @@ fig_c = mBias %>% filter(ExpName == 'Both_gap') %>% group_by(Load, gap) %>%
   scale_x_discrete(labels=c("Short Gap", "Long Gap")) +
   geom_signif(y_position = c(145,155,175), xmin = c(0.74,1.74,1.74), 
               xmax = c(1,2,2.26), annotation = c("*","**","**")) +
-  labs(x="", y="Mean Biase (ms)", fill = "Memory Load", color='Memory Load') +
+  labs(x="", y="Mean Bias (ms)", fill = "Memory Load", color='Memory Load') +
   theme_new + fillGreySet3 + greySet3 + theme(legend.position = "none", 
       plot.title = element_text(hjust = 0.5))
 
@@ -1004,7 +1039,7 @@ print(av_cv_crsExp$ANOVA)
 print(GGcr(av_cv_crsExp))
 
 # post hoc pairwise t-test
-cv_crsExp %>% group_by(NSub,Load,ExpName) %>% 
+cv_crsExp %>% group_by(NSub,Load,ExpName) %>%
   summarise(m_cv = mean(cv), n = n()) -> mcv_crsExp
 pairwise.t.test(x = mcv_crsExp$m_cv, g = mcv_crsExp$Load, paired = TRUE, p.adjust.method = 'holm')
 
@@ -1129,7 +1164,7 @@ fig_c6 = tmp3 %>% group_by(Load, ExpName2) %>%
                     color = Load), width = 0.3, position=position_dodge(.8)) +
   scale_y_reverse() + coord_cartesian(ylim = c(-20, -180)) +
   scale_x_discrete(labels=c('Exp. 6a', 'Exp. 6b', 'Exp. 6c')) +
-  labs(x="", y="Mean Biase (ms)", fill = "Memory Load", color = 'Memory Load') +
+  labs(x="", y="Mean Bias (ms)", fill = "Memory Load", color = 'Memory Load') +
   theme_new + fillGreySet3 + greySet3 + theme(legend.position = "none", 
       plot.title = element_text(hjust = 0.5))
 
@@ -1348,11 +1383,6 @@ mRep %>% filter(ExpName=='Encoding2' |ExpName=='Reproduction2'|ExpName=='baselin
 pairwise.t.test(x = mRep_mcv_6$mcv, g = mRep_mcv_6$ExpName, paired = TRUE, p.adjust.method = 'holm')
 
 ```
-
-
-
-
-
 
 
 ```{r}
@@ -1595,7 +1625,30 @@ mWM %>% filter(ExpName == 'baseline2') %>% group_by(Load) %>%
 ```
 
 
+# [*3] cross-experiment analysis
 
+## compare CTI for Exps 1 and 6a
+```{r, message=FALSE, warning=FALSE}
+# combined accuracy data from Exp1-4
+mRep_cti %>% filter(ExpName=='Encoding' | ExpName=='Encoding2') %>% 
+  group_by(ExpName, Load) -> ctiCrsEnc
+
+ctiCrsEnc %>% mutate(ExpName = as.factor(ExpName)) %>%
+  ezANOVA(dv = cti, wid = NSub, within = Load, between=ExpName, detailed = TRUE) %>%
+  calParEta2() -> avCtiCrsEnc
+print(avCtiCrsEnc)
+
+# post hoc tests
+pairwise.t.test(x = ctiCrsEnc$cti, g = ctiCrsEnc$ExpName, 
+                paired = FALSE, p.adjust.method = 'holm')
+pairwise.t.test(x = ctiCrsEnc$cti, g = ctiCrsEnc$Load, 
+                paired = TRUE, p.adjust.method = 'holm')
+
+# mean accuracy values for each exp.
+ctiCrsEnc %>% filter(ExpName=='Encoding' | ExpName=='Encoding2') %>%
+  group_by(ExpName) %>% summarise(mean(cti), sd(cti)/sqrt(n()))
+
+```
 
 
 
