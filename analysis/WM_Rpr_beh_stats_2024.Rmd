@@ -153,9 +153,14 @@ saveLong_gBias(mBias, "Reproduction")
 saveLong_gBias(mBias, "Both")
 saveLong_gBias(mBias, "Both_gap")
 saveLong_gBias(mBias, "Baseline")
-saveLong_gBias(mBias, "Encoding2")
-saveLong_gBias(mBias, "Reproduction2")
-saveLong_gBias(mBias, "baseline2")
+
+tmp = subset(mBias %>% filter(ExpName=='Encoding2' | ExpName=='Reproduction2'| ExpName=='baseline2'), 
+             select=c(ExpName, Load, gap, NSub, ms_bias)) %>% 
+    pivot_wider(names_from = c("ExpName","Load","gap"), values_from = c(ms_bias), names_sep="_")
+write.csv(tmp, paste0(getwd(),"/bhvrlt/DataAna_20240914/gBias_Exp6abc.csv"))
+# saveLong_gBias(mBias, "Encoding2")
+# saveLong_gBias(mBias, "Reproduction2")
+# saveLong_gBias(mBias, "baseline2")
 
 # save CTI
 saveLong_cti <- function(df, expname) {
@@ -1248,7 +1253,7 @@ print(GGcr(av3))
 # Post hoc pairwise t-test on mean bias
 mBias %>% filter(ExpName=='Encoding2' |ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
   group_by(NSub,Load) %>% summarise(mBias = mean(ms_bias), n = n()) -> mRep_mBias_6
-pairwise.t.test(x = mRep_mBias_6$mBias, g = mRep_gBias_6$Load, paired = TRUE, p.adjust.method = 'holm')
+pairwise.t.test(x = mRep_mBias_6$mBias, g = mRep_mBias_6$Load, paired = TRUE, p.adjust.method = 'holm')
 
 # mean bias values
 mBias %>% filter(ExpName=='Encoding2' |ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
@@ -1322,7 +1327,7 @@ av_mB6ac = mBias_6ac %>%
 print(av_mB6ac)
 print(GGcr(av_mB6ac))
 
-# Post hoc pairwise t-test on cti by Loads
+# Post hoc pairwise t-test on general bias by Loads
 mBias_6ac %>% group_by(NSub,Load) %>% summarise(m_bias = mean(ms_bias), n = n()) -> mB_6ac_load
 pairwise.t.test(x = mB_6ac_load$m_bias, g = mB_6ac_load$Load, 
                 paired = TRUE, p.adjust.method = 'holm')
@@ -1361,6 +1366,12 @@ Post hoc pairwise t-test on general bias
 mBias %>% filter(ExpName=='Encoding2' |ExpName=='Reproduction2'|ExpName=='baseline2') %>% 
   group_by(NSub,Load,ExpName) %>% summarise(mBias = mean(ms_bias), n = n()) -> mRep_gBias_6
 pairwise.t.test(x = mRep_gBias_6$mBias, g = mRep_gBias_6$Load, paired = TRUE, p.adjust.method = 'holm')
+
+av_mB6abc = mBias_6abc %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = .(Load,ExpName), detailed = TRUE) %>%
+  calParEta2()
+print(av_mB6abc)
+print(GGcr(av_mB6abc))
 
 # independent t-test on each condition
 gBias_6 <- mRep_gBias_6 %>% pivot_wider(names_from = c("Load","ExpName"), 
