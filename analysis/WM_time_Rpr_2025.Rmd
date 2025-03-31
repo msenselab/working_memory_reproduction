@@ -1,0 +1,1668 @@
+---
+title: "WM_time_Rpr_2025"
+author: "Strongway, Jiao Wu et al."
+date: "2025-03-18"
+description: "Statistical Analyses"
+output:
+  pdf_document: 
+    number_sections: true
+latex_engine: xelatex
+---
+
+# Load packages and functions
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ez)
+library(tidyverse)
+library(lme4)
+library(rstatix)
+library(ggpubr)
+library(lmerTest)
+library(emmeans)
+library(BayesFactor)
+library(sjPlot)
+library(cowplot)
+library(latex2exp)
+source('mytheme.R')
+# model version
+modelversion = 'gap_log_rstan'
+rstanmodelPath = 'modelrlt'
+modelPath = paste0(rstanmodelPath, '/models/', modelversion)
+
+```
+
+
+```{r Plotting functions, message=FALSE, warning=FALSE}
+#plot reproduction bias by duration and memory load (central tendency effect) based on mRep
+plot_cti <- function(data){
+  # from subject-level to group-level
+  data %>% group_by(Load, curDur) %>% summarise(mm_bias = mean(m_bias), se_bias = sd(m_bias)/sqrt(n())) %>%
+  ggplot(aes(curDur, mm_bias,  color = Load, shape = Load)) + 
+    geom_point(size = 2, stat = 'identity') + geom_line() + 
+    geom_errorbar(aes(ymin = mm_bias - se_bias, ymax = mm_bias + se_bias), width = 0.05) +
+    coord_cartesian(ylim = c(-0.5, 0.5)) +
+    scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) + # add horizontal dash line 0
+    geom_hline(yintercept = 0, linetype = "dashed", color = "darkgrey") +
+    labs(x="", y="Reproduction bias (s)", 
+       shape ="Memory Load", color = "Memory Load") +
+    theme_new + greySet3 + theme(legend.position = c(.8,.8), 
+        legend.text = element_text(size = 10), 
+        legend.title = element_text(size = 10, face = "bold"),
+        plot.title = element_text(hjust = 0.5))
+}
+
+# plot cv by duration and memory load based on mRep
+plot_cv <- function(data){
+  data %>% group_by(Load, curDur) %>% summarise(m_cv = mean(cv), se_cv = sd(cv)/sqrt(n())) %>%
+  ggplot(aes(curDur, m_cv, color = Load, shape = Load)) + 
+    geom_point(size = 2, stat = 'identity') + geom_line() + 
+    geom_errorbar(aes(ymin = m_cv - se_cv, ymax = m_cv + se_cv), width = 0.05) +
+    scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+    labs(x="Durations (s)", y="CV", 
+       shape ="Memory Load", color = "Memory Load") +
+    theme_new + greySet3 +   theme(legend.position = "none")
+}
+
+# plot mean biases by memory load based on mBias
+plot_bias_Load <- function(data){
+  data %>% group_by(Load) %>% summarise(bias = mean(ms_bias), se_bias = sd(ms_bias)/sqrt(n())) %>%
+  ggplot(aes(Load, bias, fill = Load)) + 
+    geom_bar(stat = 'identity', width = 0.75) + 
+    geom_errorbar(aes(ymin = bias - se_bias, ymax = bias + se_bias, color = Load), width = 0.3) +
+    scale_y_reverse() + coord_cartesian(ylim = c(-20, -180)) +
+    labs(x="Memory Load", y="Mean Bias (ms)", fill = "Memory Load", color = 'Memory Load') +
+    theme_new + fillGreySet3 + greySet3 + theme(legend.position = "none", 
+        plot.title = element_text(hjust = 0.5))
+}
+
+# plot mean cti by memory load
+plot_cti_Load <-function(data){
+  data %>% group_by(Load) %>% summarise(m_cti = mean(cti), se_cti = sd(cti)/sqrt(n())) %>%
+    ggplot(aes(Load, m_cti, fill = Load)) + 
+    geom_bar(stat = 'identity', width = 0.75) + 
+    geom_errorbar(aes(ymin = m_cti - se_cti, ymax = m_cti + se_cti, color = Load), width = 0.3) +
+    coord_cartesian(ylim = c(0.1, 0.8)) +
+    labs(x="Memory Load", y="CTI", fill = "Memory Load", color = "Memory Load") +
+    theme_new + fillGreySet3 + greySet3 + theme(legend.position = "none", 
+        plot.title = element_text(hjust = 0.5))
+}
+
+# output three figures together
+plot_fig <- function(Name, subfig = FALSE) {
+  fig_a = mRep %>% filter(ExpName == Name) %>% plot_cti()
+  fig_cv = mRep %>% filter(ExpName == Name) %>% plot_cv()
+  fig_b = mRep_cti %>% filter(ExpName == Name) %>% plot_cti_Load()
+  fig_c = mBias %>% filter(ExpName == Name) %>% plot_bias_Load()
+  if(subfig) {
+    return(list(fig_a=fig_a, fig_b=fig_b, fig_c=fig_c, fig_cv = fig_cv))
+  } else {
+    plot_grid(fig_a, fig_b, fig_cv, fig_c, labels = c('a', 'b', 'c','d'), nrow = 2)
+  }
+}
+```
+
+
+```{r anova-Greenhouse-Geisser-correction-function, message=FALSE, warning=FALSE}
+# Function for Greenhouse-Geisser corrections in ANOVA
+GGcr <- function(av){
+  list <- av$`Mauchly's Test for Sphericity`$Effect[av$`Mauchly's Test for Sphericity`$p < 0.05]
+  av_GGcr <- data.frame(Effect=character(), DFn=double(), DFd=double(), 
+                        Fval=double(),p=double(), ges=double(), partial_eta2=double())
+  for (effect in list) {
+    Effect <- paste(effect,"GG corrected")
+    idx1 = av$`Sphericity Corrections`$Effect == effect
+    idx2 = av$ANOVA$Effect == effect
+    DFn <- av$`Sphericity Corrections`$GGe[idx1] * av$ANOVA$DFn[idx2]
+    DFd <- av$`Sphericity Corrections`$GGe[idx1] * av$ANOVA$DFd[idx2]
+    Fval <- av$ANOVA$F[idx2]
+    p <- av$`Sphericity Corrections`$`p[GG]`[idx1]
+    ges <- av$ANOVA$ges[idx2]
+    partial_eta2 <- av$ANOVA$partial_eta2[idx2]
+    av_GGcr[nrow(av_GGcr)+1,] = data.frame(Effect, DFn, DFd, Fval, p, ges, partial_eta2)
+  }
+  return(av_GGcr)
+}
+
+# Function for calculate partial eta square in ANOVA
+calParEta2 <- function(tmp_aov){
+  tmp_aov$ANOVA$partial_eta2 <- tmp_aov$ANOVA$SSn/(tmp_aov$ANOVA$SSn+tmp_aov$ANOVA$SSd)
+  return(tmp_aov)
+}
+
+```
+
+
+# 1. Statistics for observations
+
+## load behavioral data
+
+```{r load data}
+# load observed data
+ExpData <- read.csv(paste0("../data/AllValidData.csv"))
+# ExpData3_add <- read.csv(paste0("../data/Exp3_add.csv"))
+
+# add meaningful name for each experiment based on Exp number
+ExpData = ExpData %>% mutate(ExpName = case_when(Exp == "Exp1" ~ 'Baseline',
+                                                 Exp == "Exp2" ~ 'Encoding',
+                                                 Exp == "Exp3" ~ 'Reproduction',
+                                                 Exp == "Exp4" ~ 'Both',
+                                                 Exp == "Exp5" ~ 'Both_gap'))
+# ExpData3_add = ExpData3_add %>% 
+#   mutate(ExpName = case_when(Exp == "Exp3_v8g" ~ 'Reproduction8',
+#                              Exp == "Exp3_v9g" ~ 'Reproduction9',
+#                              Exp == "Exp3_v10" ~ 'Reproduction10',
+#                              Exp == "Exp3_v11" ~ 'Reproduction11'))
+
+# ExpData6 <- read.csv(paste0("../data/Exp6.csv")) %>% filter(valid == 1)
+# ExpData6 = ExpData6 %>% mutate(ExpName = case_when(Exp == "Exp. 6a" ~ 'Encoding2',
+#                                                    Exp == "Exp. 6b" ~ 'Reproduction2',
+#                                                    Exp == "Exp. 6c" ~ 'baseline2'),
+#                                gap = 1)
+
+# ExpData = bind_rows(ExpData, ExpData3_add)
+
+# add working memory responses
+ExpData$WMCrr <- ExpData$TPresent == ExpData$WMRP
+# add reproduction error (bias)
+ExpData$bias <- ExpData$repDur - ExpData$curDur
+
+# map WMSize to a new column Load: 1 - low, 2 - medium, 3 - high
+ExpData$Load = factor(ExpData$WMSize, levels = c(1, 3, 5), labels = c('Low', 'Medium', 'High'))
+
+# mark the number of participants across experiments
+ExpData$subNo = 0
+ExpData = ExpData %>% mutate(subNo = ifelse(Exp=='Exp1',300,subNo))
+ExpData = ExpData %>% mutate(subNo = ifelse(Exp=='Exp2',100,subNo))
+ExpData = ExpData %>% mutate(subNo = ifelse(Exp=='Exp3',200,subNo))
+ExpData = ExpData %>% mutate(subNo = ifelse(Exp=='Exp4',400,subNo))
+ExpData = ExpData %>% mutate(subNo = ifelse(Exp=='Exp5',500,subNo))
+ExpData$subNo = ExpData$subNo + ExpData$NSub
+
+ExpData
+
+ExpData %>% filter(Exp=="Exp5")
+```
+
+
+## mean reproduction biases and working memory performance
+
+Calculate mean reproduction biases and working memory performance for each experiment.
+
+```{r meandata, message=FALSE, warning=FALSE}
+# mean reproduction biases
+mRep = ExpData %>% group_by(ExpName, NSub, subNo, WMSize, Load, gap, curDur, DurLevel) %>% 
+  summarise(m_bias = mean(bias), se_bias = sd(bias)/sqrt(n()), cv = sd(repDur)/mean(repDur), n = n()) 
+mRep$DurLevel = as.factor(mRep$DurLevel)
+
+# general bias
+mBias = mRep %>% group_by(ExpName, Load, gap, NSub, subNo) %>% 
+  summarise(ms_bias = mean(m_bias)*1000, se_bias = sd(m_bias)/sqrt(n())*1000)
+
+# mean working memory performance
+mWM = ExpData %>% group_by(ExpName, NSub, subNo, WMSize,gap, Load) %>% 
+  summarise(m_WMCrr = mean(WMCrr), se_WMCrr = sd(WMCrr)/sqrt(n()), n = n())
+
+```
+
+## Central tendency effect
+
+Next, we estimate the central tendency effect by using linear regression. First, we prepare several useful functions
+
+```{r lm_fit, message=FALSE, warning=FALSE}
+
+# a simple linear model function
+lm_model <- function(df) {
+  lm(m_bias ~ curDur, data = df)
+}
+
+# obtain the estimates of the linear model
+lm_estimate <- function(df) {
+  df %>% group_by(ExpName, NSub, subNo, gap, Load) %>% nest() %>% 
+  mutate(lm = map(data, lm_model)) %>% # linear regression
+  mutate(slope = map(lm, broom::tidy)) %>%  # get estimates
+  unnest(slope) %>% # remove raw data
+  dplyr::select(-std.error,-statistic, -p.value) %>%  # remove unnessary columns
+  spread(term, estimate) %>%   # spread stimates
+  dplyr::rename(Intercept = `(Intercept)`, slope = curDur) %>% # rename columns
+  mutate(cti = -slope) # central tendency index
+}
+
+# now estimate the central tendency effect
+mRep_cti = mRep %>% lm_estimate()
+
+```
+
+# Exp 1. Working memory impacts on the encoding phase
+
+```{r plotfigs_encoding, message=FALSE, warning=FALSE}
+# encoding manipulation
+fig_encoding = plot_fig('Encoding', subfig = TRUE)
+fig_encoding$fig_b = fig_encoding$fig_b + 
+  geom_signif(y_position = c(0.71, 0.77), xmin = c(1,1), xmax = c(2, 3), 
+              annotation = c("***", "***")) + ylim(0, 0.8)
+fig_encoding$fig_cv = fig_encoding$fig_cv + 
+  coord_cartesian(ylim = c(0.165, 0.34)) + 
+  scale_y_continuous(breaks=c(0.16, 0.2, 0.24, 0.28, 0.32))
+fig_en = plot_grid(fig_encoding$fig_a, fig_encoding$fig_cv, fig_encoding$fig_b, fig_encoding$fig_c, 
+                   labels = c('a', 'b', 'c', 'd'))
+fig_en
+# save figures
+ggsave("./figures/Figure2_encoding.png", fig_en, width = 7, height = 7)
+
+```
+
+Now rmANOVA on reproduction biases, CTI and general biases
+
+```{r rmANOVA_encoding, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av1)
+print(GGcr(av1))
+
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2()
+print(av2)
+
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2()
+print(av3)
+
+# rmANOVA on cv
+av4 = mRep %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av4)
+print(GGcr(av4))
+
+```
+
+```{r pairwise post hoc}
+# given the significance of memory load on general bias, we further conduct post hoc pairwise t-test
+mRep_cti %>% filter(ExpName == 'Encoding')  -> cti_encd
+pairwise.t.test(x = cti_encd$cti, g = cti_encd$Load, paired = TRUE, p.adjust.method = 'holm')
+
+```
+
+```{r rmanova on WM task}
+# rmANOVA on working memory task accuracy
+mWM %>% filter(ExpName == 'Encoding') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+mWM %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2() -> avm
+print(avm)
+
+```
+
+# Exp 2. Working memory impacts on the reproduction phase
+
+
+```{r plotfigs_reproduction, message=FALSE, warning=FALSE}
+# reproduction manipulation
+fig_reproduction = plot_fig('Reproduction', subfig = TRUE)
+fig_reproduction$fig_c = fig_reproduction$fig_c +
+  geom_signif(y_position = c(130, 145), xmin = c(1,1), xmax = c(2, 3), 
+              annotation = c("*", "***"), vjust = 0.5) + 
+  scale_y_reverse()
+fig_reproduction$fig_cv = fig_reproduction$fig_cv + 
+  coord_cartesian(ylim = c(0.165, 0.34)) + 
+  scale_y_continuous(breaks=c(0.16, 0.2, 0.24, 0.28, 0.32))
+fig_rp = plot_grid(fig_reproduction$fig_a, fig_reproduction$fig_cv, fig_reproduction$fig_b, fig_reproduction$fig_c, 
+                   labels = c('a', 'b', 'c', 'd'), rows=2)
+fig_rp
+# save figures
+ggsave("./figures/Figure3_reproduction.png", fig_rp, width = 7, height = 7)
+
+```
+
+
+Now rmANOVA on reproduction biases, CTI and general biases
+
+```{r rmANOVA_reproduction, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Reproduction') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av1)
+print(GGcr(av1))
+
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Reproduction' & NSub != 5) %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2()
+print(av2)
+
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Reproduction') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2()
+print(av3)
+
+# rmANOVA on cv
+av4 = mRep %>% filter(ExpName == 'Reproduction') %>% 
+  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av4)
+
+```
+
+```{r pairwise post hoc}
+# given the significance of memory load on general bias, we further conduct post hoc pairwise t-test
+mBias %>% filter(ExpName == 'Reproduction')  -> mBias_rp
+pairwise.t.test(x = mBias_rp$ms_bias, g = mBias_rp$Load, paired = TRUE, p.adjust.method = 'holm')
+
+mRep_cti %>% filter(ExpName == 'Reproduction')  -> cti_rp
+pairwise.t.test(x = cti_rp$cti, g = cti_rp$Load, paired = TRUE, p.adjust.method = 'holm')
+```
+
+```{r rmanova on WM task}
+# rmANOVA on working memory task accuracy
+mWM %>% filter(ExpName == 'Reproduction') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+mWM %>% filter(ExpName == 'Reproduction') %>% 
+  ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2() -> avm
+print(avm)
+
+# Post hoc pairwise t-test on WM accuracy
+mWM %>% filter(ExpName == 'Reproduction')  -> mWM_rp
+pairwise.t.test(x = mWM_rp$m_WMCrr, g = mWM_rp$Load, paired = TRUE, p.adjust.method = 'holm')
+
+```
+
+# Exp 3. working memory after duration task (baseline: no memory load)
+
+```{r plotfigs_baseline, message=FALSE, warning=FALSE}
+# reproduction manipulation
+fig_baseline = plot_fig('Baseline', subfig = TRUE)
+fig_baseline$fig_c = fig_baseline$fig_c + scale_y_reverse()
+
+fig_bs = plot_grid(fig_baseline$fig_b, fig_baseline$fig_c, 
+                   labels = c('a', 'b'))
+fig_bs
+# save figures
+ggsave("./figures/fig_baseline.png", fig_bs, width = 7, height = 3)
+
+```
+
+Now rmANOVA on reproduction biases, CTI and general biases
+
+```{r rmANOVA_baseline, message=FALSE, warning=FALSE}
+# rmANOVA on biases
+av1 = mRep %>% filter(ExpName == 'Baseline') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av1)
+print(GGcr(av1))
+
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Baseline') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2()
+print(av2)
+
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Baseline') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2()
+print(av3)
+
+# rmANOVA on cv
+av4 = mRep %>% filter(ExpName == 'Baseline') %>% 
+  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av4)
+```
+
+```{r calculate mean CTI}
+# mean CTI values
+mRep_cti %>% filter(ExpName == 'Baseline') %>% group_by(Load) %>% summarise(mean(cti), sd(cti)/sqrt(n()))
+
+```
+
+```{r rmanova on WM task}
+# rmANOVA on working memory task accuracy
+mWM %>% filter(ExpName == 'Baseline') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+mWM %>% filter(ExpName == 'Baseline') %>% 
+  ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2() -> avm
+print(avm)
+print(GGcr(avm))
+
+# Post hoc pairwise t-test on WM accuracy
+mWM %>% filter(ExpName == 'Baseline')  -> mWM_bl
+pairwise.t.test(x = mWM_bl$m_WMCrr, g = mWM_bl$Load, paired = TRUE, p.adjust.method = 'holm')
+
+```
+
+
+# Exp 4. Working memory on both encoding and reproduction phases
+
+```{r plotfigs_both, message=FALSE, warning=FALSE}
+# both manipulation
+fig_both = plot_fig('Both', subfig = TRUE)
+fig_both$fig_b = fig_both$fig_b + 
+  geom_signif(y_position = c(0.6, 0.65), xmin = c(1,2), xmax = c(2, 3), 
+              annotation = c("**", "**")) + ylim(0, 0.7)
+fig_both$fig_c = fig_both$fig_c + 
+  geom_signif(y_position = c(130, 145), xmin = c(1,1), xmax = c(2, 3), 
+              annotation = c("*", "*"), vjust=0.5) + ylim(-150,0) + 
+  scale_y_reverse()
+
+fig_bt = plot_grid(fig_both$fig_b, fig_both$fig_c, 
+                   labels = c('a', 'b'))
+fig_bt
+# save figures
+ggsave("./figures/fig_both.png", fig_bt, width = 7, height = 3)
+
+```
+
+ANOVAs on reproduction biases, CTI and general biases
+
+```{r rmANOVA_both, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Both') %>% 
+  ezANOVA(dv = m_bias, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av1)
+print(GGcr(av1))
+
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Both') %>% 
+  ezANOVA(dv = cti, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2()
+print(av2)
+
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Both') %>% 
+  ezANOVA(dv = ms_bias, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2()
+print(av3)
+
+# rmANOVA on cv 
+av4 = mRep %>% filter(ExpName == 'Both') %>% 
+  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av4)
+print(GGcr(av4))
+
+```
+
+
+```{r pairwise post hoc, message=FALSE, warning=FALSE}
+# Post hoc pairwise t-test on general bias
+mBias %>% filter(ExpName == 'Both') %>% group_by(Load) %>% summarise(mean(ms_bias), sd(ms_bias)/sqrt(n()))
+mBias %>% filter(ExpName == 'Both')  -> mBias_bt
+pairwise.t.test(x = mBias_bt$ms_bias, g = mBias_bt$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# Post hoc pairwise t-test on cti
+mRep_cti %>% filter(ExpName == 'Both')  -> mRep_cti_bt
+pairwise.t.test(x = mRep_cti_bt$cti, g = mRep_cti_bt$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# mRep_cti_load <- mRep_cti_bt %>% select(subNo,Load,cti) %>%
+#   pivot_wider(names_from = c("Load"), values_from = c(cti), names_sep="_")
+# t.test(mRep_cti_load$Medium, mRep_cti_load$Low, paired = TRUE, alternative = "two.sided")
+# t.test(mRep_cti_load$Medium, mRep_cti_load$High, paired = TRUE, alternative = "two.sided")
+# ttestBF(mRep_cti_load$Medium, mRep_cti_load$Low, paired = TRUE)
+# ttestBF(mRep_cti_load$Medium, mRep_cti_load$High, paired = TRUE)
+```
+
+
+```{r rmanova on WM task}
+# ANOVA on working memory accuracy
+mWM %>% filter(ExpName == 'Both') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+mWM %>% filter(ExpName == 'Both') %>% 
+  ezANOVA(dv = m_WMCrr, wid = NSub, within = Load, detailed = TRUE) %>%
+  calParEta2() -> avm
+print(avm)
+
+# post hoc pairwise t-test on WM accuracy
+mWM %>% filter(ExpName == 'Both')  -> mWM_both
+pairwise.t.test(x = mWM_both$m_WMCrr, g = mWM_both$Load, paired = TRUE, p.adjust.method = 'holm')
+
+```
+
+```{r subplots for each participant, message=FALSE, warning=FALSE, include=FALSE}
+# Previously, it observed a reduction of central tendency at high load. To further
+# explore if this is a general fashion or driven by certain outliers, here plot 
+# reproduction bias, CTI, and WM accuracy performance for each participant.
+bias_exp4_par <- mRep %>% filter(ExpName=='Both') %>%
+  group_by(curDur,Load,NSub) %>% summarise(mBias=mean(m_bias))
+fig_exp4_par <- ggplot(data=bias_exp4_par, aes(curDur,mBias,color=Load)) + 
+  geom_point() + geom_line() +
+  facet_wrap(~NSub) +
+  theme_new
+fig_exp4_par
+
+cti_exp4_par <- mRep_cti %>% filter(ExpName == 'Both') %>%
+  group_by(Load,NSub) %>% summarise(mCTI=mean(cti))
+fig2_exp4_par <- ggplot(data=cti_exp4_par, aes(Load,mCTI)) + 
+  geom_bar(stat = 'identity', width = 0.75) + 
+  facet_wrap(~NSub) +
+  theme_new
+fig2_exp4_par
+
+mwm_exp4_par <- mWM %>% filter(ExpName=='Both') %>% 
+  group_by(WMSize,NSub) %>% summarise(mWM=mean(m_WMCrr))
+fig3_exp4_par <- ggplot() + 
+  geom_bar(data=cti_exp4_par, aes(Load,mCTI),stat='identity',width=0.75) + 
+  geom_line(data=mwm_exp4_par, aes(WMSize,mWM)) +
+  geom_point(size = 2, stat = 'identity') + 
+  facet_wrap(~NSub) +
+  theme_new
+fig3_exp4_par
+
+```
+
+# Exp 5. Working memory on both encoding and reproduction phases with gap
+
+```{r plotfigs_both_gap, message=FALSE, warning=FALSE}
+# plotting short and long gap conditions together
+gap.labs <- c("Short Gap","Long Gap")
+names(gap.labs) <- c(1, 2)
+mRep$gap = as.factor(mRep$gap)
+fig_a = mRep %>% filter(ExpName == 'Both_gap') %>% 
+  group_by(Load, curDur, gap) %>% 
+  summarise(mm_bias = mean(m_bias), se_bias = sd(m_bias)/sqrt(n())) %>%
+  ggplot(aes(curDur, mm_bias, group=interaction(Load,gap), 
+             color=Load, shape=Load)) +
+  geom_point(size = 2, stat = 'identity') + geom_line() + 
+  geom_errorbar(aes(ymin = mm_bias-se_bias, ymax = mm_bias+se_bias), width=0.05) +
+  coord_cartesian(ylim = c(-0.45, 0.2)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "darkgrey") +
+  labs(x="", y="Reproduction bias (s)", 
+     shape ="Memory Load", color = "Memory Load") +
+  facet_grid(~gap, labeller = labeller(gap = gap.labs)) +
+  theme_new + greySet3 + theme(legend.position = c(.9,.8), 
+      legend.text = element_text(size = 10), 
+      legend.title = element_text(size = 10, face = "bold"),
+      plot.title = element_text(hjust = 0.5))
+
+mRep_cti$gap = as.factor(mRep_cti$gap)
+fig_b = mRep_cti %>% filter(ExpName == 'Both_gap') %>% group_by(Load, gap) %>% 
+  summarise(m_cti = mean(cti), se_cti = sd(cti)/sqrt(n())) %>%
+  ggplot(aes(gap, m_cti, group=interaction(Load, gap), fill = Load)) + 
+  geom_bar(stat = 'identity', width = 0.75, position=position_dodge(.8)) + 
+  geom_errorbar(aes(ymin = m_cti - se_cti, ymax = m_cti + se_cti, 
+                    color = Load), width = 0.3, position=position_dodge(.8)) +
+  coord_cartesian(ylim = c(0.1, 0.8)) +
+  scale_x_discrete(labels=c("Short Gap", "Long Gap")) +
+  geom_signif(y_position = c(0.54,0.62,0.56,0.64,0.75), xmin = c(0.74,0.74,1.74,1.74,1), 
+              xmax = c(1,1.26,2,2.26,2), annotation = c("*","*","*","*","***")) +
+  labs(x="", y="CTI", fill = "Memory Load", color = "Memory Load") +
+  theme_new + fillGreySet3 + greySet3 + theme(legend.position = "none", 
+      plot.title = element_text(hjust = 0.5))
+
+fig_cv = mRep %>% filter(ExpName == 'Both_gap') %>% 
+  group_by(Load, curDur, gap) %>% 
+  summarise(m_cv = mean(cv), se_cv = sd(cv)/sqrt(n())) %>%
+  ggplot(aes(curDur, m_cv, group=interaction(Load,gap), color=Load, shape=Load)) + 
+  geom_point(size = 2, stat = 'identity') + geom_line() + 
+  geom_errorbar(aes(ymin = m_cv - se_cv, ymax = m_cv + se_cv), width = 0.05) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  coord_cartesian(ylim = c(0.15, 0.30)) + 
+  scale_y_continuous(breaks=c(0.16, 0.2, 0.24, 0.28)) +
+  labs(x="Durations (s)", y="CV", shape ="Memory Load", color = "Memory Load") +
+  facet_grid(~gap, labeller = labeller(gap = gap.labs)) +
+  theme_new + greySet3 + theme(legend.position = "none", 
+                               strip.text.x = element_blank())
+
+mBias$gap = as.factor(mBias$gap)
+fig_c = mBias %>% filter(ExpName == 'Both_gap') %>% group_by(Load, gap) %>% 
+  summarise(bias = mean(ms_bias), se_bias = sd(ms_bias)/sqrt(n())) %>%
+  ggplot(aes(gap, bias, group=interaction(Load, gap), fill = Load)) + 
+  geom_bar(stat = 'identity', width = 0.75, position=position_dodge(.8)) + 
+  geom_errorbar(aes(ymin = bias - se_bias, ymax = bias + se_bias, 
+                    color = Load), width = 0.3, position=position_dodge(.8)) +
+  scale_y_reverse() + coord_cartesian(ylim = c(-20, -180)) +
+  scale_x_discrete(labels=c("Short Gap", "Long Gap")) +
+  geom_signif(y_position = c(145,155,175), xmin = c(0.74,1.74,1.74), 
+              xmax = c(1,2,2.26), annotation = c("*","**","**")) +
+  labs(x="", y="Mean Bias (ms)", fill = "Memory Load", color='Memory Load') +
+  theme_new + fillGreySet3 + greySet3 + theme(legend.position = "none", 
+      plot.title = element_text(hjust = 0.5))
+
+# combine figures
+fig_gap1 = ggarrange(fig_a, fig_b, fig_cv, fig_c, labels=c('a','b','c','d'),
+                    ncol=2, nrow = 2, widths = c(4.1,2.9), heights= c(4,3.5),
+                    common.legend = TRUE, legend = c("top"))
+fig_gap1
+
+#fig_gap2 = ggarrange(fig_b, fig_c, labels=c('a','b'))
+#fig_gap2
+
+# save figure
+ggsave("./figures/fig_gap_compact.png", fig_gap1, width = 7, height = 5)
+#ggsave("./figures/fig_gap_compact2.png", fig_gap2, width = 7, height = 3)
+```
+
+ANOVAs on reproduction biases, CTI and general biases
+
+```{r rmANOVA_gap, message=FALSE, warning=FALSE}
+# rmANOVA on reproduction biases
+av1 = mRep %>% filter(ExpName == 'Both_gap') %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = m_bias, wid = NSub, within = .(DurLevel, Load, gap), detailed = TRUE) %>%
+  calParEta2()
+print(av1)
+print(GGcr(av1))
+# short gap
+av1_short = mRep %>% filter(ExpName == 'Both_gap', gap==1) %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = m_bias, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av1_short)
+print(GGcr(av1_short))
+# long gap
+av1_long = mRep %>% filter(ExpName == 'Both_gap', gap==2) %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = m_bias, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av1_long)
+print(GGcr(av1_long))
+
+#rmANOVA on cti
+av2 = mRep_cti %>% filter(ExpName == 'Both_gap') %>%mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = cti, wid = NSub, within = .(Load, gap), detailed = TRUE) %>%
+  calParEta2()
+print(av2)
+
+#rmANOVA on general bias
+av3 = mBias %>% filter(ExpName == 'Both_gap') %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = ms_bias, wid = NSub, within = .(Load, gap), detailed = TRUE) %>%
+  calParEta2()
+print(av3)
+print(GGcr(av3))
+
+# rmANOVA on cv 
+av4 = mRep %>% filter(ExpName == 'Both_gap') %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load, gap), detailed = TRUE) %>%
+  calParEta2()
+print(av4)
+print(GGcr(av4))
+# short gap
+av4_short = mRep %>% filter(ExpName == 'Both_gap', gap==1) %>%
+  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av4_short)
+print(GGcr(av4_short))
+# long gap
+av4_long = mRep %>% filter(ExpName == 'Both_gap', gap==2) %>% 
+  ezANOVA(dv = cv, wid = NSub, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av4_long)
+print(GGcr(av4_long))
+
+
+av_cv1245 = mRep %>% filter(ExpName == 'Both_gap'|ExpName == 'Encoding'|
+                            ExpName == 'Reproduction'|ExpName == 'Both') %>%
+  ezANOVA(dv = cv, wid = subNo, within = .(DurLevel, Load), detailed = TRUE) %>%
+  calParEta2()
+print(av_cv1245)
+print(GGcr(av_cv1245))
+
+```
+
+
+Post hoc pairwise t-test on cti
+
+```{r pairwise post hoc on cti, message=FALSE, warning=FALSE}
+# load effect of cti on short and long gap
+mRep_cti %>% filter(ExpName == 'Both_gap', gap==1)  -> mRep_cti_gap1
+pairwise.t.test(x = mRep_cti_gap1$cti, g = mRep_cti_gap1$Load, paired = TRUE, p.adjust.method = 'holm')
+
+mRep_cti %>% filter(ExpName == 'Both_gap', gap==2)  -> mRep_cti_gap2
+pairwise.t.test(x = mRep_cti_gap2$cti, g = mRep_cti_gap2$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# gap effect of cti
+mRep_cti %>% filter(ExpName == 'Both_gap')  -> mRep_cti_gap
+pairwise.t.test(x = mRep_cti_gap$cti, g = mRep_cti_gap$gap, paired = TRUE, p.adjust.method = 'holm')
+
+mRep_cti %>% filter(ExpName == 'Both_gap') %>% group_by(gap) %>% 
+  summarise(m_cti = mean(cti), se_cti = sd(cti)/sqrt(n()), n = n()) 
+```
+
+
+Post hoc pairwise t-test on mean bias
+
+```{r pairwise post hoc on meanBias, message=FALSE, warning=FALSE}
+# load effect of mean bias on short and long gap
+mBias %>% filter(ExpName == 'Both_gap', gap==1)  -> mRep_mb_gap1
+pairwise.t.test(x = mRep_mb_gap1$ms_bias, g = mRep_mb_gap1$Load, paired = TRUE, p.adjust.method = 'holm')
+
+mRep_mb_gap1 %>% group_by(Load) %>% 
+  summarise(msBias = mean(ms_bias), seBias = sd(ms_bias)/sqrt(n()), n = n())
+
+mBias %>% filter(ExpName == 'Both_gap', gap==2)  -> mRep_mb_gap2
+pairwise.t.test(x = mRep_mb_gap2$ms_bias, g = mRep_mb_gap2$Load, paired = TRUE, p.adjust.method = 'holm')
+
+```
+
+Post hoc pairwise t-test on cv bias
+
+```{r pairwise post hoc on cv, message=FALSE, warning=FALSE}
+mRep %>% filter(ExpName == 'Both_gap') %>% group_by(Load) %>% summarise(m_cv = mean(cv), n = n())
+mRep %>% filter(ExpName == 'Both_gap') %>% group_by(NSub, Load) %>% 
+  summarise(m_cv = mean(cv), n = n()) -> mcv_wm
+pairwise.t.test(x = mcv_wm$m_cv, g = mcv_wm$Load, paired = TRUE, p.adjust.method = 'holm')
+
+mRep %>% filter(ExpName == 'Both_gap', gap==1) %>% group_by(NSub, Load) %>% 
+  summarise(m_cv = mean(cv), n = n()) -> mcv_wm_gap1
+pairwise.t.test(x = mcv_wm_gap1$m_cv, g = mcv_wm_gap1$Load, paired = TRUE, p.adjust.method = 'holm')
+
+mRep %>% filter(ExpName == 'Both_gap', gap==2) %>% group_by(NSub, Load) %>% 
+  summarise(m_cv = mean(cv), n = n()) -> mcv_wm_gap2
+pairwise.t.test(x = mcv_wm_gap2$m_cv, g = mcv_wm_gap2$Load, paired = TRUE, p.adjust.method = 'holm')
+
+mRep %>% filter(ExpName == 'Both_gap') %>% group_by(gap) %>% summarise(m_cv = mean(cv), n = n())
+mRep %>% filter(ExpName == 'Both_gap') %>% group_by(NSub,gap) %>% 
+  summarise(m_cv = mean(cv), n = n()) -> mcv_gap
+pairwise.t.test(x = mcv_gap$m_cv, g = mcv_gap$gap, paired = TRUE, p.adjust.method = 'holm')
+```
+
+
+```{r rmanova on WM task}
+# ANOVA on WM accuracy
+mWM %>% filter(ExpName == 'Both_gap') %>% mutate(gap = as.factor(gap)) %>%
+  ezANOVA(dv = m_WMCrr, wid = NSub, within = .(Load, gap), detailed = TRUE) %>%
+  calParEta2() -> avm
+print(avm)
+
+# post hoc pairwise t-test
+mWM %>% filter(ExpName == 'Both_gap')  -> mWM_both_gap
+pairwise.t.test(x = mWM_both_gap$m_WMCrr, g = mWM_both_gap$Load, paired = TRUE, p.adjust.method = 'holm')
+
+# mean accuracy values
+mWM %>% filter(ExpName == 'Both_gap') %>% group_by(Load) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+mWM %>% filter(ExpName == 'Both_gap') %>% group_by(gap) %>% summarise(mean(m_WMCrr), sd(m_WMCrr)/sqrt(n()))
+
+```
+
+# 2. Statistics for model predictions
+
+## replace with new Exp5 predictions
+```{r}
+## load model Prediction results
+# AllDat_predY <- read.csv(paste0(modelPath, "/rlt/AllDat_predY_",modelversion,".csv"))
+# AllDat_predY_Exp1to4 <- AllDat_predY %>% filter(Exp!="Exp5")
+# newExp5_predY <- read.csv(paste0(modelPath, "/rlt/Exp5_predY_",modelversion,"_2025.csv"))
+# AllDat_predY <- rbind(AllDat_predY_Exp1to4, newExp5_predY)
+# 
+# AllDat_newY <- read.csv(paste0(modelPath, "/rlt/AllDat_newY_",modelversion,".csv"))
+# AllDat_newY_Exp1to4 <- AllDat_newY %>% filter(Exp!="Exp5")
+# newExp5_newY <- read.csv(paste0(modelPath, "/rlt/Exp5_newY_",modelversion,"_2025.csv"))
+# AllDat_newY <- rbind(AllDat_newY_Exp1to4, newExp5_newY)
+# 
+# Bayparlist <- read.csv(paste0(modelPath, "/rlt/AllDat_Bayparlist_",modelversion,".csv"))
+# Bayparlist_Exp1to4 <- Bayparlist %>% filter(Exp!="Exp5")
+# newExp5_Bayparlist <- read.csv(paste0(modelPath, "/rlt/Exp5_Bayparlist_",modelversion,"_2025.csv"))
+# Exp5_Bayparlist <- cbind(cbind(newExp5_Bayparlist[ ,0:12],newExp5_Bayparlist[ ,15:25]),
+#                          newExp5_Bayparlist[ ,27:28])
+# Bayparlist <- rbind(Bayparlist_Exp1to4, Exp5_Bayparlist)
+# 
+# write.csv(AllDat_predY, paste0(modelPath, "/rlt/AllDat_predY_", modelversion, "_2025.csv"))
+# write.csv(AllDat_newY, paste0(modelPath, "/rlt/AllDat_newY_", modelversion, "_2025.csv"))
+# write.csv(Bayparlist, paste0(modelPath, "/rlt/AllDat_Bayparlist_", modelversion, "_2025.csv"))
+
+# newExp5_predY %>% group_by(Gap) %>%
+#   summarise(m_wp = mean(wp))
+# 
+# newExp5_newY %>% group_by(Gap) %>%
+#   summarise(m_wp = mean(wp))
+
+```
+
+
+## load modeling parameters and predictions
+
+```{r load modeling data}
+## load model Prediction results
+AllDat_predY <- read.csv(paste0(modelPath, "/rlt/AllDat_predY_",modelversion,"_2025.csv"))
+# AllDat_predY %>% filter(repDur < 0.1 | repDur > 2.5)
+
+AllDat_predY <- AllDat_predY %>% filter(repDur > 0.1, repDur < 2.5)
+AllDat_predY$WMSize <- as.factor(AllDat_predY$WMSize)
+levels(AllDat_predY$WMSize) = c("low", "medium",  "high")
+AllDat_predY$pred_Bias = AllDat_predY$mu_r - AllDat_predY$curDur
+AllDat_predY$predErr = AllDat_predY$mu_r - AllDat_predY$repDur
+AllDat_predY$relatErr = AllDat_predY$predErr / AllDat_predY$repDur
+
+# rename experiments by replacing first 3 chracters "Exp" with string "Exp. "
+# AllDat_predY$Exp <- gsub("^.{0,3}", "Exp. ", AllDat_predY$Exp)
+# AllDat_predY[which(AllDat_predY$Exp == 'Exp. 4'),"Exp"] = "Exp. 4a"
+# AllDat_predY[which(AllDat_predY$Exp == 'Exp. 5'),"Exp"] = "Exp. 4b"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp1'),"ExpName"] = "Baseline"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp2'),"ExpName"] = "Encoding"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp3'),"ExpName"] = "Reproduction"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp4'),"ExpName"] = "Both"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp5'),"ExpName"] = "Both_gap"
+AllDat_predY$ExpName = as.factor(AllDat_predY$ExpName)
+AllDat_predY[which(AllDat_predY$Exp == 'Exp1'),"Exp"] = "Exp. 3"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp2'),"Exp"] = "Exp. 1"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp3'),"Exp"] = "Exp. 2"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp4'),"Exp"] = "Exp. 4"
+AllDat_predY[which(AllDat_predY$Exp == 'Exp5'),"Exp"] = "Exp. 5"
+AllDat_predY$Exp = as.factor(AllDat_predY$Exp)
+
+AllDat_predY$gap = 1
+AllDat_predY[which(AllDat_predY$Gap == 2.500),"gap"] = 2
+AllDat_predY$gap <- factor(AllDat_predY$gap, labels = c("short", "long"))
+
+AllDat_predY$subNo = 100*as.numeric(AllDat_predY$Exp) + AllDat_predY$NSub
+AllDat_predY$subNo = as.factor(AllDat_predY$subNo)
+
+AllDat_predY
+
+```
+
+```{r load predictions}
+#load test results
+AllDat_newY <- read.csv(paste0(modelPath, "/rlt/AllDat_newY_",modelversion,"_2025.csv")) #
+AllDat_newY$WMSize <- as.factor(AllDat_newY$WMSize)
+levels(AllDat_newY$WMSize) = c("low", "medium",  "high")
+# Replace first 3 chracters "Exp" with string "Exp. "
+# AllDat_newY$Exp <- gsub("^.{0,3}", "Exp. ", AllDat_newY$Exp)
+# AllDat_newY[which(AllDat_newY$Exp == 'Exp. 4'),"Exp"] = "Exp. 4a"
+# AllDat_newY[which(AllDat_newY$Exp == 'Exp. 5'),"Exp"] = "Exp. 4b"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp1'),"ExpName"] = "Baseline"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp2'),"ExpName"] = "Encoding"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp3'),"ExpName"] = "Reproduction"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp4'),"ExpName"] = "Both"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp5'),"ExpName"] = "Both_gap"
+AllDat_newY$ExpName = as.factor(AllDat_newY$ExpName)
+AllDat_newY[which(AllDat_newY$Exp == 'Exp1'),"Exp"] = "Exp. 3"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp2'),"Exp"] = "Exp. 1"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp3'),"Exp"] = "Exp. 2"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp4'),"Exp"] = "Exp. 4"
+AllDat_newY[which(AllDat_newY$Exp == 'Exp5'),"Exp"] = "Exp. 5"
+AllDat_newY$Exp = as.factor(AllDat_newY$Exp)
+
+AllDat_newY$gap = 1
+AllDat_newY[which(AllDat_newY$Gap == 2.500, AllDat_newY$Exp == "Exp5"), "gap"] = 2
+AllDat_newY$gap = factor(AllDat_newY$gap, labels = c("short", "long"))
+
+AllDat_newY
+
+m_newY <- dplyr::group_by(AllDat_newY, ExpName, curDur, WMSize) %>%
+  dplyr::summarize(m_mu_r = mean(mu_r), m_predY = mean(predY),
+                   m_sig_r = mean(sig_r),
+                   log_lik =mean(log_lik))
+m_newY
+```
+
+## check model parameters
+
+```{r load parameters, include=FALSE}
+# load parameter estimation 
+Bayparlist <- read.csv(paste0(modelPath, "/rlt/AllDat_Bayparlist_",modelversion,"_2025.csv"))
+Bayparlist$mu_pr = exp(Bayparlist$mu_pr_log + Bayparlist$sig_pr2_log^2*0.5)
+Bayparlist$sig_pr2 = (exp(Bayparlist$sig_pr2_log^2)-1)*exp(2*Bayparlist$mu_pr_log+Bayparlist$sig_pr2_log^2)
+# Replace first 3 chracters "Exp" with string "Exp. "
+# Bayparlist$Exp <- gsub("^.{0,3}", "Exp. ", Bayparlist$Exp)
+# Bayparlist[which(Bayparlist$Exp == 'Exp. 4'),"Exp"] = "Exp. 4a"
+# Bayparlist[which(Bayparlist$Exp == 'Exp. 5'),"Exp"] = "Exp. 4b"
+Bayparlist[which(Bayparlist$Exp == 'Exp1'),"ExpName"] = "Baseline"
+Bayparlist[which(Bayparlist$Exp == 'Exp2'),"ExpName"] = "Encoding"
+Bayparlist[which(Bayparlist$Exp == 'Exp3'),"ExpName"] = "Reproduction"
+Bayparlist[which(Bayparlist$Exp == 'Exp4'),"ExpName"] = "Both"
+Bayparlist[which(Bayparlist$Exp == 'Exp5'),"ExpName"] = "Both_gap"
+Bayparlist$ExpName = as.factor(Bayparlist$ExpName)
+Bayparlist[which(Bayparlist$Exp == 'Exp1'),"Exp"] = "Exp. 3"
+Bayparlist[which(Bayparlist$Exp == 'Exp2'),"Exp"] = "Exp. 1"
+Bayparlist[which(Bayparlist$Exp == 'Exp3'),"Exp"] = "Exp. 2"
+Bayparlist[which(Bayparlist$Exp == 'Exp4'),"Exp"] = "Exp. 4"
+Bayparlist[which(Bayparlist$Exp == 'Exp5'),"Exp"] = "Exp. 5"
+Bayparlist$Exp = as.factor(Bayparlist$Exp)
+
+Bayparlist$subNo = 100*as.numeric(Bayparlist$Exp) + Bayparlist$NSub
+Bayparlist$subNo = as.factor(Bayparlist$subNo)
+
+Bayparlist
+```
+
+
+```{r mean of parameters}
+# Average Parameters 
+mm_Baypar <- dplyr::group_by(Bayparlist, ExpName) %>%
+  dplyr::summarize( m_sig_s2 = mean(sig_s2),
+                    m_sig_pr2_log = mean(sig_pr2_log),
+                    m_ks= mean(ks), 
+                    m_kr = mean(kr), 
+                    m_ls = mean(ls), 
+                    m_ts = mean(ts),
+                    m_mu_pr = mean(mu_pr),
+                    m_sig_pr2 = mean(sig_pr2),
+                    m_mu_pr_log= mean(mu_pr_log),
+                    m_sig_mn2 = mean(sig_mn2),
+                    n= n(),
+                    se_sig_s2 = sd(sig_s2)/sqrt(n-1),
+                    se_sig_mn2 = sd(sig_mn2)/sqrt(n-1),
+                    se_sig_pr2_log = sd(sig_pr2_log)/sqrt(n-1),
+                    se_ks = sd(ks)/sqrt(n-1),
+                    se_kr = sd(kr)/sqrt(n-1),
+                    se_ls =sd(ls)/sqrt(n-1),
+                    se_mu_pr_log = sd(mu_pr_log)/sqrt(n-1)) 
+mm_Baypar
+```
+
+
+```{r WAIC and LOO-CV}
+#extract waic and loo-cv from parameter list
+m_WAIC <- dplyr::group_by(Bayparlist, ExpName) %>%
+  dplyr::summarize(n =n(),
+                   m_looic = mean(looic),
+                   m_waic = mean(waic),
+                   se_waic = sd(waic)/sqrt(n-1),
+                   se_looic = sd(looic)/sqrt(n-1),
+                   m_p_loo = mean(p_loo),
+                   m_elpd_loo = mean(elpd_loo),
+                   m_se_looic = mean(se_looic),
+                   m_se_p_loo = mean(se_p_loo),
+                   m_p_waic = mean(p_waic),
+                   m_se_waic = mean(se_waic)) 
+
+m_WAIC
+```
+
+## predictions of reproduction bias
+
+```{r mean predictions}
+# calculate the mean reproduction biases for the five given intervals for all subjects
+mpredY_sub <- dplyr::group_by(AllDat_predY, curDur, Exp, ExpName, NSub, WMSize, gap) %>%
+  dplyr::summarize(n = n(), 
+                   m_repDur = mean(repDur), 
+                   sd_repDur = sd(repDur),
+                   m_mu_r = mean(mu_r),
+                   m_sig_r = mean(sig_r),
+                   m_wp = mean(wp),
+                   se_wp = sd(wp)/sqrt(n-1),
+                   log_lik =mean(log_lik),
+                   cv =sd_repDur/ m_repDur,
+                   pred_cv = mean(sig_r/mu_r),
+                   predRP_err = mean(m_mu_r-m_repDur),
+                   predVar_err = mean(m_sig_r-sd_repDur),
+                   predRP_rerr = mean(abs(m_mu_r-m_repDur)/m_repDur),
+                   predVar_rerr = mean(abs(m_sig_r-sd_repDur)/sd_repDur),
+                   predcv_err = pred_cv-cv,
+                   predcv_rerr = mean(abs(pred_cv-cv)/cv))
+
+# predicted data
+m_predY <- mpredY_sub%>% 
+  dplyr::group_by(Exp, ExpName, curDur, WMSize, gap) %>% 
+  dplyr::summarize(m_m_repDur = mean(m_repDur),
+                   m_sd_repDur = mean(sd_repDur),
+                   m_m_sig_r =mean(m_sig_r),
+                   m_m_mu_r = mean(m_mu_r),
+                   m_m_wp = mean(m_wp),
+                   n = n(),
+                   m_se_wp = sd(se_wp)/sqrt(n-1),
+                   log_lik =mean(log_lik),
+                   mpredRP_err = mean(predRP_err),
+                   mpredVar_err = mean(predVar_err),
+                   mpredRP_rerr = mean(predRP_rerr),
+                   mpredVar_rerr = mean(predVar_rerr),
+                   cv= mean(cv),
+                   pred_cv = mean(pred_cv),
+                   mpredcv_err = mean(predcv_err),
+                   mpredcv_rerr = mean(predcv_rerr))
+
+# prediction error
+m_predY_err =  mpredY_sub%>%
+  dplyr::group_by(Exp, ExpName) %>%
+  dplyr::summarize(mpred_rerr = mean(predRP_rerr)*100,
+                   mpredVar_rerr = mean(predVar_rerr)*100,
+                   mpredcv_rerr = mean(predcv_rerr)*100)
+m_predY_err
+
+```
+
+```{r plot predictions, message=FALSE}
+ExpNames <- c("Encoding", "Reproduction", "Baseline", "Both", "Both_gap")
+ExpName.labs <- c("Encoding", "Reproduction", "Baseline", "Both", "Both (with gap)")
+ExpName.labs.2lines <- c("Exp. 1\nEncoding", "Exp. 2\nReproduction", "Exp. 3\nBaseline", "Exp. 4\nBoth", "Exp. 5\nBoth (with gap)")
+names(ExpName.labs) <- ExpNames
+names(ExpName.labs.2lines) <- ExpNames
+RP_bias  <- ggplot(data = m_predY %>% filter(ExpName != "Both_gap"),
+                   aes(x = curDur, y = m_m_repDur - curDur, 
+                       color=as.factor(WMSize), shape = as.factor(WMSize))) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data= m_newY %>% filter(ExpName != "Both_gap"), 
+            aes(x=curDur, y=m_mu_r-curDur, color=WMSize)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  geom_hline(yintercept = 0, linetype='dashed')+
+  facet_grid(cols = vars(ExpName), labeller = labeller(ExpName = ExpName.labs)) +
+  labs(x="Durations (s)", y="Reproduction bias (s)", shape ="Memory Load", 
+       color = "Memory Load")+theme_new+
+  colorSet3 + theme(legend.position = "top")+ylim(-0.5, 0.4)
+# RP_bias
+# ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias.png"), RP_bias, width = 6, height = 3)
+
+RP_bias_Exp5  <- ggplot(data = AllDat_predY %>% filter(ExpName == 'Both_gap')%>% 
+                           dplyr::group_by(ExpName, curDur, WMSize, gap) %>% 
+                           dplyr::summarize(m_mu_r = mean(mu_r), m_repDur = mean(repDur), n= n(), 
+                                            se_mu_r = sd(mu_r)/sqrt(n-1)), 
+                        aes(x = curDur, y = m_repDur - curDur, group = interaction(gap, WMSize), 
+                            color=as.factor(WMSize), shape = gap)) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data= AllDat_newY %>% filter(ExpName == 'Both_gap') %>% 
+              dplyr::group_by(ExpName, curDur, WMSize, gap) %>% 
+              dplyr::summarize(m_mu_r = mean(mu_r),  n= n(), se_mu_r = sd(mu_r)/sqrt(n-1)), 
+            aes(x=curDur, y=m_mu_r-curDur, group = interaction(WMSize, gap), 
+                linetype = gap, color=WMSize)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  geom_hline(yintercept = 0, linetype='dashed')+
+  facet_grid(cols = vars(ExpName), labeller = labeller(ExpName = ExpName.labs)) +
+  labs(x="Durations (s)", y="Reproduction bias (s)", shape ="Gap", linetype = "Gap") + 
+  theme_new + colorSet3 + guides(color = "none") + theme(legend.position = "top") + ylim(-0.5, 0.4)
+RP_bias_Exp5
+
+RP_bias_all<-ggarrange(RP_bias, RP_bias_Exp5, common.legend = FALSE, ncol=2, nrow=1, 
+                       widths = c(4,1.4),  labels = c("a", "b"))
+RP_bias_all
+# ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias_all.png"), RP_bias_all, width = 9, height = 4.5)
+
+```
+
+
+```{r plot predictions (Fig in MS)}
+Exp.labs <- c("Encoding", "Reproduction", "Baseline", "Both", "Both (with gap)")
+Exp.labs.2lines <- c("Exp. 1\nEncoding", "Exp. 2\nReproduction", "Exp. 3\nBaseline", "Exp. 4\nBoth", "Exp. 5\nBoth (with gap)")
+names(Exp.labs) <- c("Exp. 1", "Exp. 2", "Exp. 3", "Exp. 4", "Exp. 5")
+RP_bias_1_5 <- ggplot(data = AllDat_predY %>% 
+                         dplyr::group_by(Exp, curDur, WMSize, gap) %>% 
+                         dplyr::summarize(m_mu_r = mean(mu_r), m_repDur = mean(repDur), n= n(), 
+                                          se_mu_r = sd(mu_r)/sqrt(n-1)), 
+                       aes(x = curDur, y = m_repDur - curDur, group = interaction(gap, WMSize), 
+                           color=as.factor(WMSize), shape = as.factor(WMSize))) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data= AllDat_newY %>% 
+              dplyr::group_by(Exp, curDur, WMSize, gap) %>% 
+              dplyr::summarize(m_mu_r = mean(mu_r),  n= n(), se_mu_r = sd(mu_r)/sqrt(n-1)), 
+            aes(x=curDur, y=m_mu_r-curDur, group = interaction(WMSize, gap), 
+                linetype = gap, color=WMSize)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  geom_hline(yintercept = 0, linetype='dashed')+
+  facet_grid(cols = vars(Exp), labeller = labeller(Exp = Exp.labs.2lines)) +
+  labs(x="Durations (s)", y="Reproduction bias (s)", shape ="Memory Load", linetype = "Gap", 
+       color = "Memory Load")+
+  theme_new + greySet3 + theme(legend.position = "top", 
+        legend.title = element_text(size = 14, face = "bold"), 
+        legend.text = element_text(size = 14), 
+        axis.title = element_text(size = 14),
+        axis.text = element_text(size = 11),
+        strip.text.x = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5))
+
+## Figures in the MS
+# ggsave(paste0(getwd(), "/", modelPath, "/figures/RP_bias_1_5.png"), RP_bias_1_5, width = 9, height = 4)
+
+RP_bias_1_5
+```
+
+## estimations of the Weight of prior
+
+```{r plot estiamted weight of prior}
+m_wp = AllDat_predY %>%dplyr::group_by(NSub, Exp, WMSize, gap) %>% dplyr::summarise(m_wp = mean(wp))
+
+plt_wp_gap <- ggplot(data = m_wp%>%dplyr::group_by(Exp, WMSize, gap) %>% 
+                       dplyr::summarise(mm_wp = mean(m_wp), n= n(), 
+                                        m_se_wp = sd(m_wp)/sqrt(n-1)), 
+                     aes(Exp, mm_wp, ymin = mm_wp - m_se_wp, ymax = mm_wp + m_se_wp, 
+                         group =interaction(Exp, WMSize, gap), 
+                         color = WMSize, shape = WMSize, linetype = gap))+
+  geom_line(stat = "identity", position = position_dodge(width = 0.3))+
+  geom_point(stat = "identity",position = position_dodge(width = 0.3))+
+  geom_errorbar(width=.3,  position = position_dodge(width = .3)) +
+  scale_x_discrete(labels = Exp.labs) + 
+  labs(x = "Experiments", y = TeX("Weight of the prior $w_p$"), color = 'Memory Load', 
+       shape = 'Memory Load', linetype= 'Gap') +
+  theme_new + greySet3 + theme(legend.position = "top", 
+        legend.title = element_text(size = 14, face = "bold"), 
+        legend.text = element_text(size = 14), 
+        axis.title = element_text(size = 14),
+        axis.text = element_text(size = 11),
+        axis.text.x = element_text(color="black", angle=30, vjust=.8, hjust=0.8),
+        strip.text.x = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5))
+
+# ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_wp.png"), plt_Inp_eq, width = 6, height = 4)
+
+plt_wp_gap
+```
+
+
+
+```{r rmanova on wp and cti}
+# mean weight of prior for critical four experiments (Exp 1,2,4,5)
+
+## general wp and cti
+gWp = AllDat_predY %>% filter(Exp!="Exp. 3") %>% 
+  summarise(m_wp = mean(wp), se_wp = sd(wp)/sqrt(n()), n = n())
+gWp
+
+gCti = mRep_cti %>% filter(ExpName!="Baseline") %>% group_by() %>% 
+  summarise(m_cti = mean(cti), se_cti = sd(cti)/sqrt(n()), n = n())
+gCti
+
+## wm effects on wp and cti
+m_wp = AllDat_predY %>% group_by(subNo, Exp, WMSize, gap) %>% summarise(m_wp = mean(wp))
+m_wp$Load = m_wp$WMSize
+m_wp$cti = m_wp$m_wp
+wm_ct_exp <- function(data){
+  av = data %>% 
+    ezANOVA(dv = cti, wid = subNo, within = .(Load), detailed = TRUE) %>%
+    calParEta2()
+    print(av)
+    # print(GGcr(av))
+    print(paste0("Effect: ",av$ANOVA$Effect,", ",
+             "F(",as.numeric(round(av$ANOVA$DFn,3)),", ",
+             as.numeric(round(av$ANOVA$DFd,3)),") = ",
+             as.numeric(round(av$ANOVA$F,3)),", p= ",
+             as.numeric(round(av$ANOVA$p,5)),", eta^2= ",
+             as.numeric(round(av$ANOVA$partial_eta2,3)) ))
+    ggcr = GGcr(av)
+    print(paste0("Effect: ", ggcr$Effect," F(",round(ggcr$DFn,3),", ",
+                 round(ggcr$DFd,3),") = ",round(ggcr$Fval,3),", p= ",
+                 round(ggcr$p,5),", eta^2= ", round(ggcr$partial_eta2,3) ))
+}
+
+# four experiments together
+wm_ct_exp(m_wp %>% filter(Exp != 'Exp. 3'))
+wm_ct_exp(mRep_cti %>% filter(ExpName!="Baseline"))
+
+# each exp.
+wm_ct_exp(m_wp %>% filter(Exp == 'Exp. 1'))
+wm_ct_exp(mRep_cti %>% filter(ExpName=="Encoding"))
+
+wm_ct_exp(m_wp %>% filter(Exp == 'Exp. 2'))
+wm_ct_exp(mRep_cti %>% filter(ExpName=="Reproduction"))
+
+wm_ct_exp(m_wp %>% filter(Exp == 'Exp. 4'))
+wm_ct_exp(mRep_cti %>% filter(ExpName=="Both"))
+
+# for Exp. 5 with Load and gap as factors
+wm_ct_exp_gap <- function(data){
+  av = data %>% 
+    ezANOVA(dv = cti, wid = subNo, within = .(Load,gap), detailed = TRUE) %>%
+    calParEta2()
+    print(av)
+    # print(GGcr(av))
+    print(paste0("Effect: ",av$ANOVA$Effect,", ",
+             "F(",as.numeric(round(av$ANOVA$DFn,3)),", ",
+             as.numeric(round(av$ANOVA$DFd,3)),") = ",
+             as.numeric(round(av$ANOVA$F,3)),", p= ",
+             as.numeric(round(av$ANOVA$p,5)),", eta^2= ",
+             as.numeric(round(av$ANOVA$partial_eta2,3)) ))
+    ggcr = GGcr(av)
+    print(paste0("Effect: ", ggcr$Effect," F(",round(ggcr$DFn,3),", ",
+                 round(ggcr$DFd,3),") = ",round(ggcr$Fval,3),", p= ",
+                 round(ggcr$p,5),", eta^2= ", round(ggcr$partial_eta2,3)))
+}
+
+wm_ct_exp_gap(m_wp %>% filter(Exp == 'Exp. 5'))
+wm_ct_exp_gap(mRep_cti %>% filter(ExpName=="Both_gap"))
+
+```
+
+
+```{r pairwise post hoc on wp}
+# post hoc pairwise t-test
+AllDat_predY %>% filter(Exp == 'Exp. 5') %>% 
+  group_by(NSub, WMSize) %>% summarise(m_wp = mean(wp)) -> cti_bothgap
+pairwise.t.test(x = cti_bothgap$m_wp, g = cti_bothgap$WMSize, paired = TRUE,
+                       p.adjust.method = 'holm', detailed = TRUE)
+
+# # linear mixed model and post hoc
+# wp5 <- m_wp %>% filter(Exp == 'Exp. 5')
+# lmm5 <- lmer(m_wp ~ WMSize*gap + (WMSize|NSub), data=wp5)
+# summary(lmm5)
+# emmeans(lmm5, pairwise ~ WMSize)
+
+# WM effect in short and long gap
+AllDat_predY %>% filter(Exp == 'Exp. 5') %>% 
+  group_by(NSub, WMSize, gap) %>% summarise(m_wp = mean(wp)) -> cti_gap_bothgap
+cti_gap <- cti_gap_bothgap %>% filter(gap=="short")
+pairwise.t.test(x = cti_gap$m_wp, g = cti_gap$WMSize, paired = TRUE,
+                       p.adjust.method = 'holm', detailed = TRUE)
+cti_gap <- cti_gap_bothgap %>% filter(gap=="long")
+pairwise.t.test(x = cti_gap$m_wp, g = cti_gap$WMSize, paired = TRUE,
+                       p.adjust.method = 'holm', detailed = TRUE)
+
+```
+
+## estimations of Inifference Point
+
+```{r calculate IP}
+sub_wp = AllDat_predY %>%dplyr::group_by(subNo, Exp, gap) %>% dplyr::summarise(wp = mean(wp)) 
+Bayparlist$gap = 'short'
+Bayparlist_5 = Bayparlist%>%filter(Exp == 'Exp. 5')
+Bayparlist_5$gap = 'long'
+Bayparlist_all = rbind(Bayparlist, Bayparlist_5)
+
+# Indifference Point based on Equation 10 in manuscript
+Eq_Inp_list <- dplyr::left_join(Bayparlist_all, sub_wp) %>% 
+  dplyr::group_by(subNo, Exp)  %>%
+  mutate(sig_post = sig_pr2_log * wp) %>%
+  mutate(InP1_log = (kr*log(1)-(1-wp)*ks*log(1)+ sig_post/2 +wp*mu_pr_log)/wp)%>%
+  mutate(InP1 = exp(InP1_log)) %>%
+  mutate(InP3_log = (kr*log(3)-(1-wp)*ks*log(3)+ sig_post/2 +wp*mu_pr_log)/wp)%>%
+  mutate(InP3 = exp(InP3_log)) %>%
+  mutate(InP5_log = (kr*log(5)-(1-wp)*ks*log(5)+ sig_post/2 +wp*mu_pr_log)/wp)%>%
+  mutate(InP5 = exp(InP5_log)) %>%
+  dplyr::select(subNo, Exp, gap, InP1, InP3, InP5, wp)
+# write.csv(Eq_Inp_list, paste0(modelPath, '/rlt/Eq_Inp_list.csv'))
+
+Eq_Inp_list
+```
+
+
+```{r plot estimated IP}
+m_Eq_Inp_list = Eq_Inp_list %>%
+  pivot_longer(cols = starts_with("InP"), names_to = "WMSize", 
+               names_prefix = "InP", values_to = "InP")
+m_Eq_Inp_list$gap = factor(m_Eq_Inp_list$gap, levels = c("short", "long"))
+m_Eq_Inp_list$WMSize <- factor(m_Eq_Inp_list$WMSize, labels = c("low", "medium",  "high")) 
+
+plt_Inp_eq =  m_Eq_Inp_list%>%dplyr::group_by(Exp, WMSize, gap)%>%
+  dplyr::summarise(m_inP= mean(InP), n =n(), se_inP = sd(InP)/sqrt(n()-1)) %>%
+  ggplot(aes(x= Exp, y=m_inP, color = WMSize, shape = WMSize, linetype = factor(gap))) +
+  geom_line(stat = "identity",position = position_dodge(width = 0.3))+
+    geom_point(stat = "identity",position = position_dodge(width = 0.3))+ 
+    geom_errorbar(width=.3,  aes(ymin = m_inP - se_inP, ymax = m_inP + se_inP), 
+                position = position_dodge(width = 0.3)) +theme_new+
+  labs(x = "Experiments", y = "Indifference point (s)", colour = "Memory Load", 
+       shape = "Memory Load", linetype = "Gap") +
+  scale_x_discrete(labels = Exp.labs) + 
+  theme_new + greySet3 + theme(legend.position = "top", 
+        legend.title = element_text(size = 14, face = "bold"), 
+        legend.text = element_text(size = 14), 
+        axis.title = element_text(size = 14),
+        axis.text = element_text(size = 11),
+        axis.text.x = element_text(color="black", angle=30, vjust=.8, hjust=0.8),
+        strip.text.x = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5))
+
+# ggsave(paste0(getwd(), "/", modelPath, "/figures/plt_Inp_eq.png"), plt_Inp_eq, width = 6, height = 4)
+
+plt_Inp_eq
+```
+
+
+
+```{r map IP to mean bias}
+# mean IP across four critical experiments
+mInP_Exps <- m_Eq_Inp_list %>% filter(Exp!='Exp. 3') %>% group_by(subNo) %>% 
+  summarize(m_InP = mean(InP)) %>% group_by() %>% 
+  summarize(m_mInP = mean(m_InP), se_mInP = sd(m_InP)/sqrt(n()))
+mInP_Exps
+
+# mean bias predicted by IP
+m_slope <- -1*gCti$m_cti
+mInP_bias_Exps <- m_Eq_Inp_list %>% filter(Exp!='Exp. 3') %>%
+  mutate(bias = 1000*(m_slope * 1.1 - m_slope * InP)) %>% group_by(subNo) %>%
+  summarize(m_bias = mean(bias)) %>% group_by() %>%
+  summarize(m_mBias = mean(m_bias), se_mBias = sd(m_bias)/sqrt(n()),
+            ci_l = m_mBias - qt(1-(0.05/2),n()-1)*se_mBias,
+            ci_h = m_mBias + qt(1-(0.05/2),n()-1)*se_mBias)
+mInP_bias_Exps
+
+# mean bias observed at the duration level of 1.1 sec
+centrBias_Exps <- mRep %>% filter(ExpName!='Baseline' & curDur == 1.1) %>% group_by(subNo) %>%
+  summarize(mBias = mean(m_bias)*1000) %>% group_by() %>% 
+  summarize(m_mBias = mean(mBias), se_mBias = sd(mBias)/sqrt(n()),
+            ci_l = m_mBias - qt(1-(0.05/2),n()-1)*se_mBias,
+            ci_h = m_mBias + qt(1-(0.05/2),n()-1)*se_mBias) -> 
+centrBias_Exps
+
+mInP_bias_Exps
+centrBias_Exps
+```
+
+```{r IP difference}
+# calculate IP difference
+Eq_Inp_list$InPdiff = 0.5*(Eq_Inp_list$InP5 - Eq_Inp_list$InP1)
+m_Eq_InpDiff_list = Eq_Inp_list %>%
+  pivot_longer(cols = starts_with("InP"), names_to = "WMSize", 
+               names_prefix = "InP", values_to = "InP")
+m_Eq_InpDiff_list$gap = factor(m_Eq_InpDiff_list$gap, levels = c("short", "long"))
+m_Eq_InpDiff_list$WMSize <- factor(m_Eq_InpDiff_list$WMSize, 
+                                   labels = c("low","medium","high","diff")) 
+m_Eq_InpDiff_list
+
+# mean IP difference in Exp. encoding and reproduction
+m_InpDiff_eq =  m_Eq_InpDiff_list %>% filter(Exp=='Exp. 1' | Exp=='Exp. 2') %>% 
+  group_by(Exp, WMSize) %>% 
+  summarise(m_inP= mean(InP), n =n(), se_inP = sd(InP)/sqrt(n()-1))
+m_InpDiff_eq
+
+# map IP difference to bias change
+m_Eq_InpDiff_list$WMSize <- paste0("wm_", m_Eq_InpDiff_list$WMSize) 
+m_InP2Bias <- m_Eq_InpDiff_list %>% 
+  filter(WMSize != "diff" & (Exp=='Exp. 1'|Exp=='Exp. 2')) %>%
+  mutate(bias = 1000*(-wp * 1.1 - (-wp) * InP)) %>%
+  select(subNo, Exp, gap, WMSize, bias) %>%
+  pivot_wider(names_from = c("WMSize"), values_from = c(bias), names_sep="_") %>%
+  mutate(wm_diff = 0.5 * (wm_high - wm_low)) %>%
+  pivot_longer(cols = starts_with("wm_"), names_to = "WMSize", 
+               names_prefix = "", values_to = "bias") %>%
+  group_by(subNo,Exp,WMSize) %>%
+  summarize(m_bias = mean(bias)) %>% group_by(Exp,WMSize) %>%
+  summarize(m_mBias = mean(m_bias), se_mBias = sd(m_bias)/sqrt(n()),
+            ci_l = m_mBias - qt(1-(0.05/2),n()-1)*se_mBias,
+            ci_h = m_mBias + qt(1-(0.05/2),n()-1)*se_mBias)
+m_InP2Bias
+
+# mean observed bias change
+mBias$Load <- paste0("wm_", mBias$Load)
+m_obsBias <- mBias %>% filter(ExpName=='Encoding'|ExpName=='Reproduction') %>% 
+  select(subNo, ExpName, gap, Load, ms_bias) %>%
+  pivot_wider(names_from = c("Load"), values_from = c(ms_bias), names_sep="_") %>%
+  mutate(wm_diff = 0.5 * (wm_High - wm_Low)) %>%
+  pivot_longer(cols = starts_with("wm_"), names_to = "Load", 
+               names_prefix = "", values_to = "bias") %>%
+  group_by(subNo,ExpName,Load) %>%
+  summarize(m_bias = mean(bias)) %>% group_by(ExpName,Load) %>%
+  summarize(m_mBias = mean(m_bias), se_mBias = sd(m_bias)/sqrt(n()),
+            ci_l = m_mBias - qt(1-(0.05/2),n()-1)*se_mBias,
+            ci_h = m_mBias + qt(1-(0.05/2),n()-1)*se_mBias)
+m_obsBias
+m_InP2Bias
+```
+
+
+
+```{r anova on InP-estimated bias and observed bias}
+## wm effects on InP-estimated bias and observed bias
+m_InP2Bias_par <- m_Eq_InpDiff_list %>% filter(WMSize != "wm_diff") %>%
+  mutate(bias = 1000*(-wp * 1.1 - (-wp) * InP)) %>%
+  select(subNo, Exp, gap, WMSize, bias) %>%
+  pivot_wider(names_from = c("WMSize"), values_from = c(bias), names_sep="_") %>%
+  mutate(wm_diff = 0.5 * (wm_high - wm_low)) %>%
+  pivot_longer(cols = starts_with("wm_"), names_to = "WMSize", 
+               names_prefix = "", values_to = "bias") %>%
+  group_by(subNo,Exp,WMSize,gap) %>% summarize(ms_bias = mean(bias))
+m_InP2Bias_par$Load = m_InP2Bias_par$WMSize
+m_InP2Bias_par$subNo <- as.factor(m_InP2Bias_par$subNo)
+mBias$subNo <- as.factor(mBias$subNo)
+
+wm_bias_exp <- function(data){
+  av = data %>% 
+    ezANOVA(dv = ms_bias, wid = subNo, within = .(Load), detailed = TRUE) %>%
+    calParEta2()
+    print(av)
+    # print(GGcr(av))
+    print(paste0("Effect: ",av$ANOVA$Effect,", ",
+             "F(",as.numeric(round(av$ANOVA$DFn,3)),", ",
+             as.numeric(round(av$ANOVA$DFd,3)),") = ",
+             as.numeric(round(av$ANOVA$F,3)),", p= ",
+             as.numeric(round(av$ANOVA$p,5)),", eta^2= ",
+             as.numeric(round(av$ANOVA$partial_eta2,3)) ))
+    ggcr = GGcr(av)
+    print(paste0("Effect: ", ggcr$Effect," F(",round(ggcr$DFn,3),", ",
+                 round(ggcr$DFd,3),") = ",round(ggcr$Fval,3),", p= ",
+                 round(ggcr$p,5),", eta^2= ", round(ggcr$partial_eta2,3) ))
+}
+
+# four experiments together
+wm_bias_exp(m_InP2Bias_par %>% filter(Exp=='Exp. 1'))
+wm_bias_exp(mBias %>% filter(ExpName=="Encoding"))
+
+```
+
+
+## estimations of parameters ks, kr and ls
+```{r para. ks and kr}
+para_k_par <- Bayparlist %>% group_by(subNo,Exp) %>% summarize(m_ks = mean(ks), m_kr = mean(kr)) 
+para_k_par
+
+para_k <- para_k_par %>% group_by(Exp) %>% 
+  summarize(m_mks = mean(m_ks),se_mks = sd(m_ks)/sqrt(n()),
+            m_mkr = mean(m_kr),se_mkr = sd(m_kr)/sqrt(n()))
+para_k
+
+# one sample t test for ks in Exp1
+k_exp1 <- para_k_par %>% filter(Exp=="Exp. 1")
+t.test(k_exp1$m_ks, mu = 0)
+ttestBF(k_exp1$m_ks, mu = 0)
+
+k_exp2 <- para_k_par %>% filter(Exp=="Exp. 2")
+t.test(k_exp2$m_kr, mu = 0)
+ttestBF(k_exp2$m_kr, mu = 0)
+
+k_exp4 <- para_k_par %>% filter(Exp=="Exp. 4")
+t.test(k_exp4$m_ks, mu = 0)
+ttestBF(k_exp4$m_ks, mu = 0)
+t.test(k_exp4$m_kr, mu = 0)
+ttestBF(k_exp4$m_kr, mu = 0)
+
+k_exp5 <- para_k_par %>% filter(Exp=="Exp. 5")
+t.test(k_exp5$m_ks, mu = 0)
+ttestBF(k_exp5$m_ks, mu = 0)
+t.test(k_exp5$m_kr, mu = 0)
+ttestBF(k_exp5$m_kr, mu = 0)
+
+```
+
+```{r para. ls}
+para_l_par <- Bayparlist %>% group_by(subNo,Exp) %>% summarize(m_ls = mean(ls)) 
+para_l_par
+
+para_l <- para_l_par %>% group_by(Exp) %>% 
+  summarize(m_mls = mean(m_ls),se_mls = sd(m_ls)/sqrt(n()))
+para_l
+
+# one sample t test for ks in Exp1
+l_exp1 <- para_l_par %>% filter(Exp=="Exp. 1")
+t.test(l_exp1$m_ls, mu = 0)
+ttestBF(l_exp1$m_ls, mu = 0)
+
+# l_exp2 <- para_l_par %>% filter(Exp=="Exp. 2")
+# t.test(l_exp2$m_ls, mu = 0)
+# ttestBF(l_exp2$m_ls, mu = 0)
+
+l_exp4 <- para_l_par %>% filter(Exp=="Exp. 4")
+t.test(l_exp4$m_ls, mu = 0)
+ttestBF(l_exp4$m_ls, mu = 0)
+
+l_exp5 <- para_l_par %>% filter(Exp=="Exp. 5")
+t.test(l_exp5$m_ls, mu = 0)
+ttestBF(l_exp5$m_ls, mu = 0)
+
+
+t.test(l_exp1$m_ls, mu = 0)
+t.test(l_exp4$m_ls, mu = 0)
+t.test(l_exp5$m_ls, mu = 0)
+
+# comparison between encoding and both
+t.test(l_exp1$m_ls, l_exp4$m_ls, paired = FALSE, alternative = "greater")
+ttestBF(l_exp1$m_ls, l_exp4$m_ls, paired = FALSE)
+
+t.test(l_exp1$m_ls, l_exp5$m_ls, paired = FALSE, alternative = "greater")
+ttestBF(l_exp1$m_ls, l_exp5$m_ls, paired = FALSE)
+```
+
+## cv for predicted reproduction biases
+
+```{r correlation r on bias and cv}
+AllDat_predY$obs_Bias = AllDat_predY$repDur - AllDat_predY$curDur
+AllDat_predY$DurLevel <- AllDat_predY$curDur
+mRep_pred = AllDat_predY %>% group_by(ExpName, Exp, subNo, NSub, WMSize, gap, curDur, DurLevel) %>% 
+  summarise(m_obs_Bias = mean(obs_Bias), m_pred_Bias = mean(pred_Bias),
+            m_repDur = mean(repDur), sd_repDur = sd(repDur),
+            m_predDur = mean(predY), sd_predDur = sd(predY), 
+            repCV = sd_repDur/m_repDur, predCV = sd_predDur/m_predDur, n = n()) 
+mRep_pred$DurLevel = as.factor(mRep_pred$DurLevel)
+
+# calculate r on mean bias
+for (exp_i in ExpNames) {
+  dat <- mRep_pred %>% filter(ExpName == exp_i)
+  r_obs_pred = cor(dat$m_repDur, dat$m_predDur)
+  print(paste0("r(", exp_i, ")=", round(r_obs_pred,5)))
+}
+
+# calculate r on cv
+for (exp_i in ExpNames) {
+  dat <- mRep_pred %>% filter(ExpName == exp_i)
+  r_obs_pred = cor(dat$repCV, dat$predCV)
+  print(paste0("r(", exp_i, ")=", round(r_obs_pred,5)))
+}
+
+```
+
+
+```{r rmanova on cv}
+# rmANOVA on cv
+prd_av1 = mRep_pred %>% filter(ExpName == 'Encoding') %>% 
+  ezANOVA(dv = predCV, wid = subNo, within = .(DurLevel, WMSize), detailed = TRUE) %>%
+  calParEta2()
+print(prd_av1)
+print(GGcr(prd_av1))
+
+prd_av4 = mRep_pred %>% filter(ExpName == 'Both') %>% 
+  ezANOVA(dv = predCV, wid = subNo, within = .(DurLevel, WMSize), detailed = TRUE) %>%
+  calParEta2()
+print(prd_av4)
+print(GGcr(prd_av4))
+
+prd_av5 = mRep_pred %>% filter(ExpName == 'Both_gap') %>% 
+  ezANOVA(dv = predCV, wid = subNo, within = .(DurLevel, WMSize), detailed = TRUE) %>%
+  calParEta2()
+print(prd_av5)
+print(GGcr(prd_av5))
+
+```
+
+```{r plot predicted cv}
+cv_newY <- dplyr::group_by(AllDat_newY, Exp, curDur, WMSize, gap) %>%
+  dplyr::summarize(m_mu_r = mean(mu_r), m_predY = mean(predY),
+                   m_sig_r = mean(sig_r),
+                   log_lik =mean(log_lik))
+cv_newY
+
+curDurItem <- unique(m_predY$curDur)
+RP_CV <- ggplot(data= m_predY, 
+                aes(x=curDur, y= cv, group = interaction(gap, WMSize),
+                    color = as.factor(WMSize), shape = as.factor(WMSize) )) +
+  geom_point(size=2, alpha = 0.5)+
+  # , shape = as.factor(WMSize)  
+  geom_line(data = cv_newY, aes(x=curDur, y=m_sig_r/m_predY, group = interaction(WMSize, gap),
+                linetype = gap, color=WMSize)) +
+  #geom_point(data= m_newY %>% filter(curDur %in% curDurItem), aes(x=curDur, y=m_sig_r/m_predY, color=WMSize,  shape = as.factor('Prediction')),alpha = 0.5) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  facet_grid(~Exp) +
+  labs(x="Durations (s)", y="Mean CV (s)", shape="Memory Load", linetype = "Gap", 
+       color = "Memory Load") + theme_new + colorSet3 + 
+  theme(legend.position = "top", 
+        legend.title = element_text(size = 14, face = "bold"), 
+        legend.text = element_text(size = 14), 
+        axis.title = element_text(size = 14),
+        axis.text = element_text(size = 11),
+        strip.text.x = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+RP_CV
+```
+
+
+# figures for manuscript and appendix
+
+```{r plot predicted bias}
+plt_pBias =  AllDat_predY %>% group_by(subNo, Exp, WMSize, gap) %>%
+  summarise(pBias= mean(pred_Bias)*1000) %>% group_by(Exp, WMSize, gap) %>%
+  summarise(m_pBias= mean(pBias), se_pBias = sd(pBias)/sqrt(n()-1), n =n()) %>%
+  ggplot(aes(x= Exp, y=m_pBias, color = WMSize, shape = WMSize, linetype = factor(gap))) +
+  geom_line(stat = "identity",position = position_dodge(width = 0.3))+
+    geom_point(stat = "identity",position = position_dodge(width = 0.3))+ 
+    geom_errorbar(width=.3,  aes(ymin = m_pBias - se_pBias, ymax = m_pBias + se_pBias), 
+                position = position_dodge(width = 0.3)) + 
+  labs(x = "Experiments", y = "Predicted mean biases (ms)", colour = "Memory Load", 
+       shape = "Memory Load", linetype = "Gap") +
+  scale_x_discrete(labels = Exp.labs) + 
+  scale_y_reverse() + coord_cartesian(ylim = c(0, -180)) +
+  theme_new + greySet3 + theme(legend.position = "top", 
+        legend.title = element_text(size = 14, face = "bold"), 
+        legend.text = element_text(size = 14), 
+        axis.title = element_text(size = 14),
+        axis.text = element_text(size = 11),
+        axis.text.x = element_text(color="black", angle=30, vjust=.8, hjust=0.8),
+        strip.text.x = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5))
+
+plt_pBias
+```
+
+```{r plot correlations of bias}
+# plot correlation coefficients r of observed and predicted bias
+plt_corr_obs_pred <- ggplot(data = mRep_pred, 
+                        aes(x = m_obs_Bias, y = m_pred_Bias, color = as.factor(WMSize),
+                            shape = as.factor(gap))) +
+  geom_point(size=1, alpha = 0.5) + 
+  facet_grid(~Exp) + 
+  labs(x="Observed Bias (s)", y=" Predicted Bias (s)", shape="Gap",
+       color = "Memory Load") + theme_new + colorSet3 + 
+  theme(legend.position = "top", 
+        legend.title = element_text(size = 14, face = "bold"), 
+        legend.text = element_text(size = 14), 
+        axis.title = element_text(size = 14),
+        axis.text = element_text(size = 11),
+        # axis.text.x = element_text(color="black", angle=30, vjust=.8, hjust=0.8),
+        strip.text.x = element_blank(),
+        plot.title = element_text(hjust = 0.5))
+plt_corr_obs_pred
+
+```
+
+```{r plot combined wp and inp (Fig in MS)}
+## combine InP and wp 
+fig_wp_InP_gap<-ggarrange(plt_wp_gap, plt_Inp_eq, common.legend = TRUE, 
+                          ncol=2, nrow=1,labels = c("a", "b"))
+# ggsave(paste0(getwd(), "/", modelPath, "/figures/fig_wp_InP_gap.png"),
+#        fig_wp_InP_gap, width = 8, height = 4)
+fig_wp_InP_gap
+
+# fig_wp_bias <- ggarrange(plt_wp_gap, plt_pBias, common.legend = TRUE, 
+#                           ncol=2, nrow=1,labels = c("a", "b"))
+# 
+# fig_wp_bias
+```
+
+
+```{r plot combined predictions on bias cv and obs-pred correlation (Fig in Appendix)}
+# plot color plots for Appendix
+RP_bias <- ggplot(data = AllDat_predY %>% 
+                         dplyr::group_by(Exp, curDur, WMSize, gap) %>% 
+                         dplyr::summarize(m_mu_r = mean(mu_r), m_repDur = mean(repDur), n= n(), 
+                                          se_mu_r = sd(mu_r)/sqrt(n-1)), 
+                       aes(x = curDur, y = m_repDur - curDur, group = interaction(gap, WMSize), 
+                           color=as.factor(WMSize), shape = as.factor(WMSize))) +
+  geom_point(size=2, alpha = 0.5)+
+  geom_line(data= AllDat_newY %>% 
+              dplyr::group_by(Exp, curDur, WMSize, gap) %>% 
+              dplyr::summarize(m_mu_r = mean(mu_r),  n= n(), se_mu_r = sd(mu_r)/sqrt(n-1)), 
+            aes(x=curDur, y=m_mu_r-curDur, group = interaction(WMSize, gap), 
+                linetype = gap, color=WMSize)) +
+  scale_x_continuous(breaks=c(0.5, 0.8, 1.1, 1.4, 1.7)) +
+  geom_hline(yintercept = 0, linetype='dashed')+
+  facet_grid(cols = vars(Exp), labeller = labeller(Exp = Exp.labs.2lines)) +
+  labs(x="Durations (s)", y="Mean bias (s)", shape ="Memory Load", linetype = "Gap", 
+       color = "Memory Load")+
+  theme_new + colorSet3 + theme(legend.position = "top", 
+        legend.title = element_text(size = 14, face = "bold"), 
+        legend.text = element_text(size = 14), 
+        axis.title = element_text(size = 14),
+        axis.text = element_text(size = 11),
+        strip.text.x = element_text(size = 12),
+        plot.title = element_text(hjust = 0.5))
+RP_bias
+
+## combine predicted bias and cv
+fig_bias_cv <- ggarrange(RP_bias, RP_CV, plt_corr_obs_pred, common.legend = TRUE,
+                         ncol=1, nrow=3, heights = c(1.1, 0.9, 0.9), 
+                         labels = c("a", "b", "c"))
+ggsave(paste0(getwd(), "/", modelPath, "/figures/fig_bias_cv_pred.png"),
+       fig_bias_cv, width = 9, height = 9)
+fig_bias_cv
+```
+
