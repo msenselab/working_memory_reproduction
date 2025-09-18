@@ -18,13 +18,14 @@ knitr::opts_chunk$set(echo = TRUE)
 library(rlist)
 library(tidyverse)
 library(rstan)
+library(ggpubr)
 
 sizeInModel <- c(1, 2, 3)
 colorSet3 <- scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9")) 
 colorSet4 <- scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9", "#1a9641")) 
 colorSet <- scale_color_manual(values=c("#d7191c", "#fdae61", "#a6d96a", "#1a9641")) 
 
-rootPath = '/Users/jiaowu/Documents/OpenAccessCodes/Zang_WM_durRep/'
+rootPath = '../'
 codePath = paste0(rootPath, 'analysis/')
 dataPath = paste0(rootPath, 'data/')
 stanCodePath = paste0(codePath, 'RStanCode/')
@@ -37,23 +38,25 @@ options(mc.cores = parallel::detectCores()-1)
 rstan_options (auto_write=TRUE)
 setwd(codePath)
 source('gap_rstan_log.R') 
-#source('rstan_linear.R')
+
 rstanmodelPath = 'modelrlt'
 modelversion = 'gap_log_rstan'
 modelPath = paste0(rstanmodelPath, '/models/', modelversion)
-library(ggpubr)
+
 ```
 
 
 ```{r include=FALSE}
 ## read data
 dat <- read.csv(paste0(dataPath, "AllValidData.csv"))
-AllExpData <- dat %>% filter(Exp=="Exp5") # repDur>0.1 & repDur<2.5
+AllExpData <- dat %>% filter(Exp=="Exp5") # %>% filter(repDur>0.1 & repDur<2.5)
+
 AllExpData$log_RP <- log(AllExpData$repDur)
 AllExpData$log_dur <- log(AllExpData$curDur)
 AllExpData$Gap <- AllExpData$Gap * 1000
 
-# max(AllExpData$repDur)
+# AllExpData$RP_bias = AllExpData$repDur - AllExpData$curDur
+# AllExpData = AllExpData %>% filter(abs(RP_bias) < 1) %>% filter(repDur > 0.2)
 AllExpData
 ```
 
@@ -62,7 +65,6 @@ AllExpData
 ```{r include=FALSE}
 # load the model
 myrstanModel  <- stan_model(file=paste0(stanCodePath, modelversion,".stan"))
-
 ```
 
 ```{r include=FALSE}
@@ -76,15 +78,16 @@ if(noEffect){
 runModelonlocal<- function(AllExpData, myrstanModel){
   expList <- unique(AllExpData$Exp)
   # expList = c('Exp2', 'Exp3', 'Exp4')
-  # subList <- unique(AllExpData$NSub)
-  subList <- unique(AllExpData$NSub)[0:1]
   
   for (expName in expList) {
     Allrlt <- list()
     data_exp <- AllExpData %>% dplyr::filter(Exp == expName)
     data_exp$model <- expName
+    subList <- unique(data_exp$NSub)
+    # subList <- unique(data_exp$NSub)[0:1]
     sub_exp <-  split(data_exp, data_exp$NSub) # split data for each subject
     for (subNo in subList) {
+      print(paste0('Now run rstan model ', expName,' on Subject No.',subNo, ' in ', expName))
       rlt <-  funFitStan(sub_exp[[subNo]], myrstanModel, noEffect)
       saveRDS(rlt, file = paste0(getwd(), "/", modelPath, "/rlt/rlt_", expName,"_sub",subNo,".rds"))
       Allrlt <- list.append(Allrlt,rlt)
@@ -139,9 +142,9 @@ funMergeMRlt <- function(explist, path, modelversion){
       }
     }
   }
-  write.csv(Bayparlist, paste0(getwd(), "/", path, "/rlt/AllDat_Bayparlist_", modelversion, ".csv"))
-  write.csv(AllDat_predY, paste0( getwd(), "/",path, "/rlt/AllDat_predY_", modelversion, ".csv"))
-  write.csv(AllDat_newY, paste0(getwd(), "/",path, "/rlt/AllDat_newY_", modelversion, ".csv"))
+  write.csv(Bayparlist, paste0(getwd(), "/", path, "/rlt/AllDat_Bayparlist_", modelversion, "_2025.csv"))
+  write.csv(AllDat_predY, paste0( getwd(), "/",path, "/rlt/AllDat_predY_", modelversion, "_2025.csv"))
+  write.csv(AllDat_newY, paste0(getwd(), "/",path, "/rlt/AllDat_newY_", modelversion, "_2025.csv"))
   saveRDS(modelResultAll, file = paste0(getwd(), "/", path, "/rlt/modelResultAll_", modelversion, ".rds")) 
 }
 
@@ -149,6 +152,7 @@ funMergeMRlt('Exp5', modelPath, modelversion) # c('Exp1','Exp2','Exp3','Exp4', '
 ```
 
 ```{r}
+# run model for a quick glance
 dat_sub1 <- readRDS(file.path(paste0(getwd(), "/", modelPath, "/rlt/rlt_Exp5_sub1.rds")))
 
 dat_sub1_predY <- dat_sub1$PredY_list
@@ -156,7 +160,6 @@ dat_sub1_newY <- dat_sub1$NewY_list
 
 dat_sub1$PredY_list %>% group_by(Gap,WMSize) %>%
   summarise(m_wp = mean(wp),m_predY = mean(predY),m_mu_r = mean(mu_r),m_sig_r = mean(sig_r))
-
 
 dat_sub1$NewY_list %>% group_by(Gap,WMSize) %>%
   summarise(m_wp = mean(wp),m_predY = mean(predY),m_mu_r = mean(mu_r),m_sig_r = mean(sig_r))

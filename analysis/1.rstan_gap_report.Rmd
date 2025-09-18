@@ -84,7 +84,7 @@ funMergeMRlt(c('Exp1','Exp2','Exp3','Exp4', 'Exp5'), modelPath, modelversion)
 # load all data and model results
 
 ```{r}
-AllExpData = read.csv(paste0("../data/AllValidData.csv")) %>%filter(valid == 1)
+AllExpData = read.csv(paste0("../data/AllValidData.csv")) %>% filter(valid == 1)
 dur <- sort(unique(AllExpData$curDur))
 
 AllExpData$WMSize <- factor(AllExpData$WMSize, labels = c("low", "medium",  "high")) 

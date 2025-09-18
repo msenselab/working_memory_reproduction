@@ -140,7 +140,6 @@ calParEta2 <- function(tmp_aov){
 ```{r load data}
 # load observed data
 ExpData <- read.csv(paste0("../data/AllValidData.csv"))
-# ExpData3_add <- read.csv(paste0("../data/Exp3_add.csv"))
 
 # add meaningful name for each experiment based on Exp number
 ExpData = ExpData %>% mutate(ExpName = case_when(Exp == "Exp1" ~ 'Baseline',
@@ -148,19 +147,6 @@ ExpData = ExpData %>% mutate(ExpName = case_when(Exp == "Exp1" ~ 'Baseline',
                                                  Exp == "Exp3" ~ 'Reproduction',
                                                  Exp == "Exp4" ~ 'Both',
                                                  Exp == "Exp5" ~ 'Both_gap'))
-# ExpData3_add = ExpData3_add %>% 
-#   mutate(ExpName = case_when(Exp == "Exp3_v8g" ~ 'Reproduction8',
-#                              Exp == "Exp3_v9g" ~ 'Reproduction9',
-#                              Exp == "Exp3_v10" ~ 'Reproduction10',
-#                              Exp == "Exp3_v11" ~ 'Reproduction11'))
-
-# ExpData6 <- read.csv(paste0("../data/Exp6.csv")) %>% filter(valid == 1)
-# ExpData6 = ExpData6 %>% mutate(ExpName = case_when(Exp == "Exp. 6a" ~ 'Encoding2',
-#                                                    Exp == "Exp. 6b" ~ 'Reproduction2',
-#                                                    Exp == "Exp. 6c" ~ 'baseline2'),
-#                                gap = 1)
-
-# ExpData = bind_rows(ExpData, ExpData3_add)
 
 # add working memory responses
 ExpData$WMCrr <- ExpData$TPresent == ExpData$WMRP
@@ -180,8 +166,6 @@ ExpData = ExpData %>% mutate(subNo = ifelse(Exp=='Exp5',500,subNo))
 ExpData$subNo = ExpData$subNo + ExpData$NSub
 
 ExpData
-
-ExpData %>% filter(Exp=="Exp5")
 ```
 
 
