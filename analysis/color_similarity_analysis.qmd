@@ -1,0 +1,600 @@
+---
+title: "Visual Working Memory Color Analysis"
+date: "`r Sys.Date()`"
+format:
+  html:
+    theme: default
+    toc: true
+    number-sections: true
+    code-fold: true
+    self-contained: true
+    embed-resources: true
+  pdf:
+    number-sections: true
+    latex-engine: xelatex
+---
+
+# Load packages and setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(readr)
+library(cowplot)
+# set project folder as working directory
+# Source custom theme
+source('mytheme.R')
+```
+
+# Read experimental data
+
+```{r read-data}
+# Read all experimental data files
+data_files <- list.files("../data", pattern = "^Exp[1-5]_.*\\.csv$", full.names = TRUE)
+
+# Function to read and add experiment info
+read_exp_data <- function(file_path) {
+  exp_name <- str_extract(basename(file_path), "Exp[1-5]_[A-Za-z]+")
+  data <- read_csv(file_path, show_col_types = FALSE)
+  data$Experiment <- exp_name
+  # rename subj as unique subject id across experiments: exp_name + NSub
+  data$subj = paste0(exp_name, "_", data$NSub)
+  return(data)
+}
+
+# Read all data files
+all_data <- map_dfr(data_files, read_exp_data)
+
+# Display data structure
+cat("Total trials:", nrow(all_data), "\n")
+cat("Experiments:", unique(all_data$Experiment), "\n")
+cat("Memory load conditions:", unique(all_data$WMSize), "\n")
+cat("Number of subjects:", length(unique(all_data$NSub)), "\n")
+
+head(all_data)
+```
+
+# Calculate color differences
+
+```{r color-diff}
+# Calculate color difference between target and test colors
+# Colors are in radians (0 to 2π), so we need to handle circular differences
+calculate_color_diff <- function(target, response) {
+  # Calculate absolute difference
+  diff <- abs(target - response)
+  # Handle circular nature: if difference > π, use 2π - difference
+  diff <- ifelse(diff > pi, 2*pi - diff, diff)
+  return(diff)
+}
+
+# Add color difference column
+all_data <- all_data %>%
+  mutate(
+    color_diff = calculate_color_diff(presentColorDeg, respColorDeg),
+    color_diff_degrees = color_diff * 180 / pi  # Convert to degrees for interpretation
+  )
+
+# Display color difference statistics
+cat("Color difference statistics (degrees):\n")
+summary(all_data$color_diff_degrees)
+
+# Plot distribution of color differences
+ggplot(all_data, aes(x = color_diff_degrees)) +
+  geom_histogram(bins = 50, fill = "lightblue", alpha = 0.7) +
+  labs(x = "Color Difference (degrees)", y = "Count",
+       title = "Distribution of Color Differences") +
+  theme_new
+```
+
+# Group trials by color similarity
+
+```{r color-similarity}
+# set similarity threshold to 25 degree
+diff_threshold <- 25 * pi / 180  # Convert to radians
+
+# Create color similarity groups including same color trials
+all_data_with_similarity <- all_data %>%
+  mutate(
+    color_similarity = case_when(
+      color_diff == 0 ~ "Same Color",
+      (color_diff <= diff_threshold) | (color_diff >= pi - diff_threshold) ~ "More Similar",
+      TRUE ~ "Less Similar"
+    ),
+    color_similarity = factor(color_similarity, levels = c("Same Color", "More Similar", "Less Similar"))
+  )
+
+# Display grouping results
+cat("Color similarity grouping:\n")
+table(all_data_with_similarity$color_similarity)
+
+# Keep the different_color_data for central tendency analysis (backward compatibility)
+different_color_data <- all_data_with_similarity %>%
+  filter(color_diff > 0)
+
+cat("\nTrials with different colors:", nrow(different_color_data), "\n")
+```
+
+# Calculate VWM accuracy
+
+```{r vwm-accuracy}
+# VWM accuracy calculation
+# WMRP: 1 = same color, 2 = different color
+# TPresent: 1 = present (same), 2 = absent (different)
+# Accuracy = correct identification of same vs different
+
+all_data_with_similarity <- all_data_with_similarity %>%
+  mutate(
+    # Ground truth: if presentColorDeg == respColorDeg, then same (1), else different (2)
+    true_response = ifelse(presentColorDeg == respColorDeg, 1, 2),
+    # Calculate accuracy
+    vwm_correct = ifelse(WMRP == true_response, 1, 0)
+  )
+
+# Calculate accuracy by condition for all trials (including same color)
+accuracy_summary <- all_data_with_similarity %>%
+  group_by(Experiment, WMSize, color_similarity, subj) %>%
+  summarise(
+    n_trials = n(),
+    n_correct = sum(vwm_correct, na.rm = TRUE),
+    accuracy = mean(vwm_correct, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+# Calculate group-level statistics
+group_accuracy <- accuracy_summary %>%
+  group_by(Experiment, WMSize, color_similarity) %>%
+  summarise(
+    n_subjects = n(),
+    mean_accuracy = mean(accuracy, na.rm = TRUE),
+    sd_accuracy = sd(accuracy, na.rm = TRUE),
+    se_accuracy = sd_accuracy / sqrt(n_subjects),
+    .groups = "drop"
+  )
+
+print(group_accuracy)
+
+# Update different_color_data with accuracy calculation for backward compatibility
+different_color_data <- different_color_data %>%
+  mutate(
+    true_response = ifelse(presentColorDeg == respColorDeg, 1, 2),
+    vwm_correct = ifelse(WMRP == true_response, 1, 0)
+  )
+```
+
+# Statistical analysis
+
+```{r stats}
+# do repeated measures ANOVA on accuracy with set size and experiment as factors
+library(afex)
+anova_results <- aov_ez(
+  id = "subj",
+  dv = "accuracy",
+  data = accuracy_summary,
+  within = c("WMSize"),
+  between = 'Experiment',
+  type = 3
+)
+
+cat("Accuracy by Memory Load:\n")
+print(anova_results)
+
+# Mixed ANOVA on color similarity analysis
+# Within-subject factors: memory load (WMSize) and color similarity (same, similar, less)
+# Between-subject factor: Experiment
+anova_color_similarity <- aov_ez(
+  id = "subj",
+  dv = "accuracy",
+  data = accuracy_summary,
+  within = c("WMSize", "color_similarity"),
+  between = "Experiment",
+  type = 3
+)
+
+cat("\nMixed ANOVA - Memory Load x Color Similarity x Experiment:\n")
+print(anova_color_similarity)
+
+# Post-hoc comparisons for significant main effects
+library(emmeans)
+
+# Post-hoc for memory load (WMSize) from first ANOVA
+cat("\nPost-hoc comparisons for Memory Load:\n")
+emmeans_wmsize <- emmeans(anova_results, ~ WMSize)
+pairs_wmsize <- pairs(emmeans_wmsize, adjust = "bonferroni")
+print(emmeans_wmsize)
+print(pairs_wmsize)
+
+# Post-hoc for experiment from first ANOVA
+cat("\nPost-hoc comparisons for Experiment:\n")
+emmeans_exp <- emmeans(anova_results, ~ Experiment)
+pairs_exp <- pairs(emmeans_exp, adjust = "bonferroni")
+print(emmeans_exp)
+print(pairs_exp)
+
+# Post-hoc for color similarity analysis
+# Memory load comparisons within color similarity ANOVA
+cat("\nPost-hoc comparisons for Memory Load (Color Similarity ANOVA):\n")
+emmeans_wmsize_color <- emmeans(anova_color_similarity, ~ WMSize)
+pairs_wmsize_color <- pairs(emmeans_wmsize_color, adjust = "bonferroni")
+print(emmeans_wmsize_color)
+print(pairs_wmsize_color)
+
+# Color similarity comparisons
+cat("\nPost-hoc comparisons for Color Similarity:\n")
+emmeans_color <- emmeans(anova_color_similarity, ~ color_similarity)
+pairs_color <- pairs(emmeans_color, adjust = "bonferroni")
+print(emmeans_color)
+print(pairs_color)
+
+# Experiment comparisons within color similarity ANOVA
+cat("\nPost-hoc comparisons for Experiment (Color Similarity ANOVA):\n")
+emmeans_exp_color <- emmeans(anova_color_similarity, ~ Experiment)
+pairs_exp_color <- pairs(emmeans_exp_color, adjust = "bonferroni")
+print(emmeans_exp_color)
+print(pairs_exp_color)
+
+
+# Test if the accuracy pattern reverse in the more similar condition
+more_similar_data <- accuracy_summary %>%
+  filter(color_similarity == "More Similar")
+anova_more_similar <- aov_ez(
+  id = "subj",
+  dv = "accuracy",
+  data = more_similar_data,
+  within = c("WMSize"),
+  between = "Experiment",
+  type = 3
+)
+cat("\nANOVA for More Similar Condition:\n")
+print(anova_more_similar)
+
+# post-hoc for memory load in More similar condition
+cat("\nPost-hoc comparisons for Memory Load (More Similar Condition):\n")
+emmeans_wmsize_more <- emmeans(anova_more_similar, ~ WMSize)
+pairs_wmsize_more <- pairs(emmeans_wmsize_more, adjust = "bonferroni")
+print(emmeans_wmsize_more)
+print(pairs_wmsize_more)
+
+
+```
+
+# Plot results
+
+```{r plot-results, fig.width=10, fig.height=6}
+# Create line plot with error bars
+plot_data <- group_accuracy %>%
+  mutate(
+    WMSize_factor = factor(WMSize, levels = c(1, 3, 5),
+                          labels = c("Load 1", "Load 3", "Load 5"))
+  )
+
+# overall accuracy plot
+
+p0 <- ggplot(plot_data %>% group_by(Experiment, WMSize_factor) %>%
+                summarise(mean_accuracy = mean(mean_accuracy),
+                          se_accuracy = sqrt(sum(se_accuracy^2)/n()),
+                          .groups = "drop")
+  , aes(x = WMSize_factor, y = mean_accuracy,
+                           color = Experiment, group = Experiment)) +
+  geom_point(size = 3, position = position_dodge(width = 0.1)) +
+  geom_line(position = position_dodge(width = 0.1)) +
+  geom_errorbar(aes(ymin = mean_accuracy - se_accuracy,
+                    ymax = mean_accuracy + se_accuracy),
+                width = 0.1, position = position_dodge(width = 0.1)) +
+  scale_y_continuous(limits = c(.5, 1.1), labels = scales::percent_format()) +
+  labs(
+    x = "Memory Load",
+    y = "Accuracy (%)",
+    color = "Experiment",
+  ) +
+  theme_new +
+  theme(
+      legend.position = c(0.8, 0.8),
+    legend.background = element_blank(),
+    plot.title = element_text(size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5)
+  )
+
+# save overall accuracy plot to subfolder 'figures'
+ggsave("figures/overall_accuracy_plot.png", plot = p0, width = 4, height = 4)
+print(p0)
+
+p1 <- ggplot(plot_data, aes(x = WMSize_factor, y = mean_accuracy,
+                           color = color_similarity, group = color_similarity)) +
+  geom_point(size = 3, position = position_dodge(width = 0.1)) +
+  geom_line(position = position_dodge(width = 0.1)) +
+  geom_errorbar(aes(ymin = mean_accuracy - se_accuracy,
+                    ymax = mean_accuracy + se_accuracy),
+                width = 0.1, position = position_dodge(width = 0.1)) +
+  facet_wrap(~Experiment, nrow = 1) +
+  scale_y_continuous(limits = c(.4, 1), labels = scales::percent_format()) +
+  labs(
+    x = "Memory Load",
+    y = "Accuracy (%)",
+    color = "Color Similarity",
+  ) +
+    greySet3 +
+  theme_new +
+  theme(
+    legend.position = 'bottom',
+    legend.background = element_blank(),
+    plot.title = element_text(size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 12, hjust = 0.5)
+  )
+
+ggsave("figures/accuracy_by_color_similarity_plot.png", plot = p1, width = 10, height = 3)
+print(p1)
+
+```
+
+# Central Tendency Effect Analysis
+
+## Calculate duration reproduction error
+
+```{r duration-error}
+# Calculate duration reproduction error (repDur - curDur) for each trial
+# Use all_data_with_similarity to include all three color similarity conditions
+duration_error_data <- all_data_with_similarity %>%
+  mutate(
+    duration_error = repDur - curDur,
+    curDur_factor = factor(curDur)
+  )
+
+# Display summary statistics
+cat("Duration reproduction error statistics (all conditions):\n")
+cat("Mean error:", round(mean(duration_error_data$duration_error, na.rm = TRUE), 3), "seconds\n")
+cat("SD error:", round(sd(duration_error_data$duration_error, na.rm = TRUE), 3), "seconds\n")
+
+# Check data availability by experiment and color similarity
+duration_summary <- duration_error_data %>%
+  group_by(Experiment, WMSize, color_similarity) %>%
+  summarise(
+    n_trials = n(),
+    n_subjects = n_distinct(subj),
+    .groups = "drop"
+  )
+
+cat("\nData availability by condition:\n")
+print(duration_summary)
+```
+
+## Average reproduction error by conditions
+
+```{r average-error}
+# Calculate subject-level averages first, then group averages
+subject_averages <- duration_error_data %>%
+  group_by(Experiment, subj, WMSize, color_similarity, curDur) %>%
+  summarise(
+    mean_error = mean(duration_error, na.rm = TRUE),
+    n_trials = n(),
+    .groups = "drop"
+  ) %>%
+  filter(n_trials >= 1)  # Ensure we have at least 1 trial per condition
+
+# Calculate group-level statistics for plotting
+group_averages <- subject_averages %>%
+  group_by(Experiment, WMSize, color_similarity, curDur) %>%
+  summarise(
+    n_subjects = n(),
+    mean_duration_error = mean(mean_error, na.rm = TRUE),
+    sd_duration_error = sd(mean_error, na.rm = TRUE),
+    se_duration_error = sd_duration_error / sqrt(n_subjects),
+    .groups = "drop"
+  ) %>%
+  filter(n_subjects >= 2)  # Ensure we have at least 2 subjects for error bars
+
+cat("Group averages calculated for", nrow(group_averages), "conditions\n")
+cat("Including all three color similarity conditions:", paste(unique(group_averages$color_similarity), collapse = ", "), "\n")
+print(head(group_averages))
+```
+
+## Plot central tendency effects
+
+```{r cti-plots, fig.width=14, fig.height=10}
+# Prepare plot data with proper factors and labels
+plot_cti_data <- group_averages %>%
+  mutate(
+    WMSize_factor = factor(WMSize, levels = c(1, 3, 5),
+                          labels = c("Load 1", "Load 3", "Load 5")),
+    curDur_factor = factor(curDur),
+    Experiment_clean = str_replace(Experiment, "_", ": ")
+  )
+
+
+# Alternative visualization: Grid layout with color similarity as columns
+p_cti_grid <- ggplot(plot_cti_data, aes(x = curDur, y = mean_duration_error,
+                                        color = color_similarity)) +
+  geom_point(size = 2.5, position = position_dodge(width = 0.02)) +
+  geom_line(aes(group = color_similarity), position = position_dodge(width = 0.02), size = 1) +
+  geom_errorbar(aes(ymin = mean_duration_error - se_duration_error,
+                    ymax = mean_duration_error + se_duration_error),
+                width = 0.03, position = position_dodge(width = 0.02)) +
+  geom_hline(yintercept = 0, linetype = "dotted", alpha = 0.7) +
+  facet_grid(WMSize_factor ~ Experiment_clean, scales = "free") +
+  scale_x_continuous(breaks = unique(plot_cti_data$curDur)) +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73")) +
+  labs(
+    x = "Physical Duration (seconds)",
+    y = "Reproduction Error (seconds)",
+    color = "Memory Load"
+  ) +
+  theme_new +
+  theme(
+    legend.position = "bottom",
+    plot.title = element_text(size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 11, hjust = 0.5),
+    strip.text = element_text(size = 9),
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+ggsave("figures/cti_by_color_similarity_grid.png", plot = p_cti_grid, width = 12, height = 8)
+print(p_cti_grid)
+```
+
+## Summary statistics for central tendency effects
+
+```{r cti-summary}
+# Calculate CTI slopes using linear regression for each subject and condition
+# Filter to ensure we have enough data points for regression
+cti_slopes <- subject_averages %>%
+  group_by(Experiment, subj, WMSize, color_similarity) %>%
+  filter(n() >= 3) %>%  # Need at least 3 duration points for stable regression
+  do({
+    if(nrow(.) >= 3 && length(unique(.$curDur)) >= 2) {
+      tryCatch({
+        model <- lm(mean_error ~ curDur, data = .)
+        data.frame(
+          slope = coef(model)[2],
+          intercept = coef(model)[1],
+          r_squared = summary(model)$r.squared
+        )
+      }, error = function(e) {
+        data.frame(slope = NA, intercept = NA, r_squared = NA)
+      })
+    } else {
+      data.frame(slope = NA, intercept = NA, r_squared = NA)
+    }
+  }) %>%
+  ungroup() %>%
+  filter(!is.na(slope))  # Remove failed fits
+
+cat("CTI slopes calculated for", nrow(cti_slopes), "subject-condition combinations\n")
+
+# Group-level slope statistics
+slope_summary <- cti_slopes %>%
+  group_by(Experiment, WMSize, color_similarity) %>%
+  summarise(
+    n_subjects = n(),
+    mean_slope = mean(slope, na.rm = TRUE),
+    sd_slope = sd(slope, na.rm = TRUE),
+    se_slope = sd_slope / sqrt(n_subjects),
+    .groups = "drop"
+  )
+
+cat("Central Tendency Effect Slopes (more negative = stronger central tendency):\n")
+print(slope_summary)
+
+# Test if slopes are significantly different from 0 (no central tendency)
+slope_tests <- cti_slopes %>%
+  group_by(Experiment, WMSize, color_similarity) %>%
+  filter(n() >= 3) %>%  # Need at least 3 subjects for t-test
+  do({
+    slopes <- .$slope[!is.na(.$slope)]
+    if(length(slopes) >= 3) {
+      tryCatch({
+        t_result <- t.test(slopes, mu = 0)
+        data.frame(
+          n_subjects = length(slopes),
+          t_stat = as.numeric(t_result$statistic),
+          p_value = as.numeric(t_result$p.value),
+          mean_slope = as.numeric(t_result$estimate),
+          ci_lower = as.numeric(t_result$conf.int[1]),
+          ci_upper = as.numeric(t_result$conf.int[2])
+        )
+      }, error = function(e) {
+        data.frame(
+          n_subjects = length(slopes),
+          t_stat = NA, p_value = NA, mean_slope = mean(slopes),
+          ci_lower = NA, ci_upper = NA
+        )
+      })
+    } else {
+      data.frame(
+        n_subjects = length(slopes),
+        t_stat = NA, p_value = NA, mean_slope = ifelse(length(slopes) > 0, mean(slopes), NA),
+        ci_lower = NA, ci_upper = NA
+      )
+    }
+  }) %>%
+  ungroup()
+
+cat("\nTests against zero slope (no central tendency):\n")
+print(slope_tests)
+
+# ANOVA on CTI slopes to test color similarity effects
+cat("\n=== ANOVA Analysis of CTI Slopes ===\n")
+
+# Mixed ANOVA on slopes with color similarity, memory load, and experiment as factors
+library(afex)
+slope_anova <- aov_ez(
+  id = "subj",
+  dv = "slope",
+  data = cti_slopes,
+  within = c("WMSize", "color_similarity"),
+  between = "Experiment",
+  type = 3
+)
+
+cat("Mixed ANOVA on CTI Slopes - Memory Load x Color Similarity x Experiment:\n")
+print(slope_anova)
+
+# Post-hoc comparisons for significant effects
+library(emmeans)
+
+# Color similarity effects on CTI slopes
+cat("\nPost-hoc comparisons for Color Similarity effects on CTI slopes:\n")
+emmeans_color_slopes <- emmeans(slope_anova, ~ color_similarity)
+pairs_color_slopes <- pairs(emmeans_color_slopes, adjust = "bonferroni")
+print(emmeans_color_slopes)
+print(pairs_color_slopes)
+
+# Memory load effects on CTI slopes
+cat("\nPost-hoc comparisons for Memory Load effects on CTI slopes:\n")
+emmeans_load_slopes <- emmeans(slope_anova, ~ WMSize)
+pairs_load_slopes <- pairs(emmeans_load_slopes, adjust = "bonferroni")
+print(emmeans_load_slopes)
+print(pairs_load_slopes)
+
+# Experiment effects on CTI slopes
+cat("\nPost-hoc comparisons for Experiment effects on CTI slopes:\n")
+emmeans_exp_slopes <- emmeans(slope_anova, ~ Experiment)
+pairs_exp_slopes <- pairs(emmeans_exp_slopes, adjust = "bonferroni")
+print(emmeans_exp_slopes)
+print(pairs_exp_slopes)
+
+# Interaction effects: Color similarity x Memory load
+# Check if interaction is significant from ANOVA output
+anova_table <- anova(slope_anova)
+if("WMSize:color_similarity" %in% rownames(anova_table) &&
+   anova_table["WMSize:color_similarity", "Pr(>F)"] < 0.05) {
+  cat("\nInteraction: Color Similarity x Memory Load:\n")
+  emmeans_interaction <- emmeans(slope_anova, ~ color_similarity | WMSize)
+  pairs_interaction <- pairs(emmeans_interaction, adjust = "bonferroni")
+  print(emmeans_interaction)
+  print(pairs_interaction)
+} else {
+  cat("\nColor Similarity x Memory Load interaction not significant, skipping post-hoc analysis.\n")
+}
+
+# Summary of key findings
+cat("\n=== Summary of CTI Slope Analysis ===\n")
+overall_slopes <- cti_slopes %>%
+  group_by(color_similarity) %>%
+  summarise(
+    n_subjects = n(),
+    mean_slope = mean(slope, na.rm = TRUE),
+    sd_slope = sd(slope, na.rm = TRUE),
+    se_slope = sd_slope / sqrt(n_subjects),
+    .groups = "drop"
+  )
+
+cat("Overall CTI slopes by color similarity condition:\n")
+print(overall_slopes)
+
+# Effect sizes for color similarity differences
+cat("\nEffect size analysis (Cohen's d) for color similarity differences:\n")
+same_slopes <- cti_slopes$slope[cti_slopes$color_similarity == "Same Color"]
+similar_slopes <- cti_slopes$slope[cti_slopes$color_similarity == "More Similar"]
+dissimilar_slopes <- cti_slopes$slope[cti_slopes$color_similarity == "Less Similar"]
+
+# Cohen's d calculations
+cohens_d <- function(x, y) {
+  pooled_sd <- sqrt(((length(x) - 1) * var(x) + (length(y) - 1) * var(y)) / (length(x) + length(y) - 2))
+  (mean(x) - mean(y)) / pooled_sd
+}
+
+cat("Same vs More Similar: d =", round(cohens_d(same_slopes, similar_slopes), 3), "\n")
+cat("Same vs Less Similar: d =", round(cohens_d(same_slopes, dissimilar_slopes), 3), "\n")
+cat("More Similar vs Less Similar: d =", round(cohens_d(similar_slopes, dissimilar_slopes), 3), "\n")
+```

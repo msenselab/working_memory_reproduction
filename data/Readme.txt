@@ -12,7 +12,7 @@ repVDur			the presented duration while reproduction
 repDur			the reproduced duration
 presentColorDeg	the color degree of the target patch in 2π (0 ~ 6.28)
 respColorDeg		the color degree of the probe patch in 2π (0 ~ 6.28)
-WMRP			the response of working memory task
+WMRP			the response of working memory task (1=same color, 2=different color)
 
 
 Table info for the data file of experiment 5:
