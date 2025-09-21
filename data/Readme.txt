@@ -13,6 +13,11 @@ repDur			the reproduced duration
 presentColorDeg	the color degree of the target patch in 2π (0 ~ 6.28)
 respColorDeg		the color degree of the probe patch in 2π (0 ~ 6.28)
 WMRP			the response of working memory task (1=same color, 2=different color)
+clrPtch1			the color degree of the 1st color patch (1~360)
+clrPtch2			the color degree of the 2nd color patch (1~360 for WMSize=3 or 5 levels, 0 for WMSize=1)
+clrPtch3			the color degree of the 3rd color patch (1~360 for WMSize=3 or 5 levels, 0 for WMSize=1)
+clrPtch4			the color degree of the 4th color patch (1~360 for WMSize=5 level, 0 for WMSize=1 or 3)
+clrPtch5			the color degree of the 5th color patch (1~360 for WMSize=5 level, 0 for WMSize=1 or 3)
 
 
 Table info for the data file of experiment 5:
