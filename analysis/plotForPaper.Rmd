@@ -27,24 +27,13 @@ library(ggplot2)
 library(readr)
 source('mytheme.R')
 ```
+## Setting
 
-
-## Including Plots
-
-
-```{r pressure, echo=FALSE}
-# 读取数据
-ParaList <-  read_csv("../data/FreeParameters/FreeParameters_ParaList.csv")
-# 统一实验顺序
-new_order <- c("Encoding", "Reproduction", "Baseline", "Both", "Both_gap")
-
-ParaList$Exp <- factor(
-  ParaList$Exp,
-  levels = new_order
-)
-
-ParaList$Gap <- factor(ParaList$Gap, labels = c("short", "long"))
-
+```{r}
+modelname = "Experimentwise"
+filepath = paste0("../data/", modelname,"/")
+# 设置实验顺序
+order_exp <- c("Encoding", "Reproduction", "Baseline", "Both", "Both_gap")
 exp_labels <- c(
   "Encoding"     = "Exp. 1\nEncoding",
   "Reproduction" = "Exp. 2\nReproduction",
@@ -52,6 +41,19 @@ exp_labels <- c(
   "Both"         = "Exp. 4\nBoth",
   "Both_gap"     = "Exp. 5\nBoth (with gap)"
 )
+```
+
+
+## Load data
+
+```{r pressure, echo=FALSE}
+# 读取数据
+ParaList <-  read_csv(paste0(filepath, modelname, "_ParaList.csv"))
+ParaList$Gap <- factor(ParaList$Gap, labels = c("short", "long"))
+ParaList$Exp <- factor(ParaList$Exp, levels = order_exp)
+ParaList$WMSize <- factor(ParaList$WMSize, labels = c("low", "medium",  "high")) 
+
+
 
 
 # 参数名（根据实际列名修改）
@@ -141,8 +143,6 @@ ggplot(df_summary, aes(x = Exp, y = Mean, group = 1)) +
     y = "Mean"
   ) +
   theme_new
-# 保存图像
-#ggsave("Para_modelname.png", width = 9, height = 5, dpi = 300)
 ```
 ```{r}
 # 绘图
@@ -169,31 +169,24 @@ theme(axis.text.x = element_text(angle = 30, hjust = 1))
 ```
 ## predicted bias
 
+
+### predict_single_subject
+
 ```{r}
-mdat_all <- read_csv("../data/FreeParameters/FreeParameters_mdat_all.csv")
-View(mdat_all)
+mdat_all <- read_csv(paste0(filepath, modelname, "_mdat_all.csv"))
+mdat_all$Exp <- factor(mdat_all$Exp, levels = order_exp)
+mdat_all$Gap <- factor(mdat_all$Gap, labels = c("short", "long"))
+mdat_all$WMSize <- factor(mdat_all$WMSize, labels = c("low", "medium",  "high")) 
 ```
 
 ```{r}
-PredRPList <- read_csv("../data/FreeParameters/FreeParameters_PredRPList.csv")
-PredRPList$Gap <- factor(PredRPList$Gap)
+# Here the predicted RP was based on function predict_single_subject
+PredRPList <- read_csv(paste0(filepath, modelname, "_PredRPList.csv"))
 
 PredRPList$WMSize <- factor(PredRPList$WMSize, labels = c("low", "medium",  "high")) 
 PredRPList$Gap <- factor(PredRPList$Gap, labels = c("short", "long"))
 
-
-# 设置实验顺序
-order_exp <- c("Encoding", "Reproduction", "Baseline", "Both", "Both_gap")
-mdat_all$Exp <- factor(mdat_all$Exp, levels = order_exp)
-mdat_all$Gap <- factor(mdat_all$Gap, labels = c("short", "long"))
-mdat_all$WMSize <- factor(mdat_all$WMSize, labels = c("low", "medium",  "high")) 
 PredRPList$Exp <- factor(PredRPList$Exp, levels = order_exp)
-
-ParaList$Exp <- factor(ParaList$Exp, levels = order_exp)
-ParaList$Gap <- factor(ParaList$Gap, labels = c("short", "long"))
-ParaList$WMSize <- factor(ParaList$WMSize, labels = c("low", "medium",  "high")) 
-
-
 ```
 
 
@@ -211,7 +204,7 @@ RP_bias_bw <- ggplot(data = mdat_all%>%
   geom_line(data = PredRPList %>% dplyr::group_by(Exp, curDur, WMSize, Gap) %>% dplyr::summarize(m_mu_r = mean(mu_r), n = n(), se_mu_r = sd(mu_r)/sqrt(n-1)), aes(x = curDur, y = m_mu_r - curDur, group = interaction(WMSize, Gap), linetype = Gap, color = as.factor(WMSize))) +
   geom_hline(yintercept = 0, linetype = "dashed") +
   
-  facet_grid(cols = vars(Exp), labeller = labeller(Exp = Exp.labs.2lines)) +
+  facet_grid(cols = vars(Exp)) +
   scale_color_grey(start = 0.2, end = 0.7) +
   scale_shape_manual(values = c(16, 1, 17, 2, 15, 0)) + 
   scale_linetype_manual(values = c("solid", "dotted")) +
@@ -224,18 +217,58 @@ RP_bias_bw <- ggplot(data = mdat_all%>%
   theme(legend.position = "top")
 
 RP_bias_bw
-ggsave(paste0(getwd(), "/figures/RP_bias_bw_freeparam.png"), RP_bias_bw, width = 8, height = 4)
+ggsave(paste0(getwd(), "/figures/RP_bias_bw_", modelname,".png"), RP_bias_bw, width = 8, height = 4)
+```
 
+
+### predict_newdata_from_posterior
+
+```{r}
+# Here the predicted RP was based on function predict_newdata_from_posterior
+
+newdat_all <- read_csv(paste0(filepath, modelname, "_newdat_all.csv")) %>%
+  filter(!(Exp != "Both_gap" & Gap == 2.5))
+
+newdat_all$Exp <- factor(newdat_all$Exp, levels = order_exp)
+newdat_all$Gap <- factor(newdat_all$Gap, labels = c("short", "long"))
+newdat_all$WMSize <- factor(newdat_all$WMSize, labels = c("low", "medium",  "high")) 
+newdat_all <- newdat_all %>% 
+  rename(curDur = xnew)
+```
+
+
+```{r}
+RP_bias_bw2 <- ggplot(data = mdat_all%>% 
+                         dplyr::group_by(Exp, curDur, WMSize, Gap) %>% 
+                         dplyr::summarize(m_repDur_mean = mean(repDur_mean),  n= n(), se_repDur_mean = sd(repDur_mean)/sqrt(n-1)), 
+                      aes(x = curDur, y = m_repDur_mean - curDur, 
+                          group = interaction(Gap, WMSize), 
+                          color = as.factor(WMSize),
+                          shape = as.factor(WMSize))) +
+  geom_point(size = 2, alpha = 0.5) +
+  geom_line(data = newdat_all %>% dplyr::group_by(Exp, curDur, WMSize, Gap) %>% dplyr::summarize(mmPred = mean(mPred), n = n(), se_mPred = sd(mPred)/sqrt(n-1)), aes(x = curDur, y = mmPred - curDur, group = interaction(WMSize, Gap), linetype = Gap, color = as.factor(WMSize))) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  
+  facet_grid(cols = vars(Exp)) +
+  scale_color_grey(start = 0.2, end = 0.7) +
+  scale_shape_manual(values = c(16, 1, 17, 2, 15, 0)) + 
+  scale_linetype_manual(values = c("solid", "dotted")) +
+  labs(x = " ", 
+       y = "Reproduction bias (s)", 
+       shape = "Memory Load", 
+       linetype = "Gap", 
+       color = "Memory Load") +
+  theme_new +
+  theme(legend.position = "top")
+
+RP_bias_bw2
+ggsave(paste0(getwd(), "/figures/RP_bias_bw2_",modelname,".png"), RP_bias_bw2, width = 8, height = 4)
 ```
 
 
 ## weight of prior
 
 ```{r}
-ParaList$Exp <- factor(ParaList$Exp,
-    levels = c("Encoding", "Reproduction", "Baseline", "Both", "Both_gap")
-)
-
 plt_wp_Gap <- ggplot(
   data = ParaList %>%
     dplyr::group_by(Exp, WMSize, Gap) %>%
@@ -337,6 +370,6 @@ plt_pred_Bias
 ```
 ```{r}
 fig7<-ggarrange(plt_wp_Gap_wb, plt_pred_Bias, common.legend = TRUE, ncol=2, nrow=1,  labels = c("a", "b"))
-ggsave(paste0(getwd(), "/figures/fig7.png"), fig7, width = 7, height = 4)
+ggsave(paste0(getwd(), "/figures/fig7_",modelname,".png"), fig7, width = 7, height = 4)
 fig7
 ```
