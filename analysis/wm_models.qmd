@@ -113,6 +113,11 @@ expData = expData.dropna(subset=['ExpName'])
 
 print(expData.ExpName.unique())
 expData.head()
+
+# due to encoding of 'gap' in Encoding as 2, Reproduction as 3, we need to reset to 1, consistent with other experiments
+# change gap =1 when ExpName == "Encoding" or "Reproduction"
+expData.loc[expData['ExpName'].isin(['Encoding', 'Reproduction']), 'gap'] = 1
+
 ```
 
 ## Model Definition
@@ -151,22 +156,22 @@ def hModel(dat, constrain):
         
         # k_s: working memory coeff. on ticks (Encoding Mean)
         if constrain[0] == 1:
-            k_s0 = pm.HalfNormal('k_s', 1) 
-            k_s =  k_s0 * epsilon_k 
+            k_s0 = pm.HalfNormal('k_s0', 1) 
+            k_s =  pm.Deterministic('k_s', k_s0 * epsilon_k) 
         else:
             k_s = np.zeros(nsub)
             
         # l_s: working memory impacts on variance (Encoding Variance)
         if constrain[1] == 1:
-            l_s0 = pm.HalfNormal('l_s', 1) 
-            l_s = l_s0 * epsilon_k
+            l_s0 = pm.HalfNormal('l_s0', 1) 
+            l_s = pm.Deterministic('l_s', l_s0 * epsilon_k)
         else:
             l_s = np.zeros(nsub)
                   
         # k_r: working memory influence on reproduction (Reproduction Mean)
         if constrain[3] == 1:
-            k_r0 = pm.Normal('k_r', 0, sigma = 1) 
-            k_r =  k_r0 * epsilon_k
+            k_r0 = pm.Normal('k_r0', 0, sigma = 1) 
+            k_r =  pm.Deterministic('k_r', k_r0 * epsilon_k)
         else:
             k_r = np.zeros(nsub) 
 
@@ -341,7 +346,7 @@ models_config = {
 
 experiment_wise_map = {
     'Baseline': [0, 0, 0, 0],
-    'Encoding': [1, 1, 0, 0],
+    'Encoding': [1, 1, 1, 0],
     'Reproduction': [0, 0, 0, 1],
     'Both': [1, 1, 0, 1],
     'Both_gap': [1, 1, 1, 1]
