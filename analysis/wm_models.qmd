@@ -157,21 +157,21 @@ def hModel(dat, constrain):
         # k_s: working memory coeff. on ticks (Encoding Mean)
         if constrain[0] == 1:
             k_s0 = pm.HalfNormal('k_s0', 1) 
-            k_s =  pm.Deterministic('k_s', k_s0 * epsilon_k) 
+            k_s =  pm.Deterministic('k_s', epsilon_k * k_s0) 
         else:
             k_s = np.zeros(nsub)
             
         # l_s: working memory impacts on variance (Encoding Variance)
         if constrain[1] == 1:
             l_s0 = pm.HalfNormal('l_s0', 1) 
-            l_s = pm.Deterministic('l_s', l_s0 * epsilon_k)
+            l_s = pm.Deterministic('l_s', epsilon_k * l_s0)
         else:
             l_s = np.zeros(nsub)
                   
         # k_r: working memory influence on reproduction (Reproduction Mean)
         if constrain[3] == 1:
             k_r0 = pm.Normal('k_r0', 0, sigma = 1) 
-            k_r =  pm.Deterministic('k_r', k_r0 * epsilon_k)
+            k_r =  pm.Deterministic('k_r', epsilon_k * k_r0)
         else:
             k_r = np.zeros(nsub) 
 
@@ -216,7 +216,7 @@ def hModel(dat, constrain):
         
         # Sampling
         # Using smaller tune/draws for testing, increase for production
-        trace = pm.sample(draws=niter, tune=1000, progressbar=True, return_inferencedata=True, target_accept=0.85, idata_kwargs={'log_likelihood': True})
+        trace = pm.sample(draws=niter, tune=1000, progressbar=True, return_inferencedata=True, target_accept=0.85, init = "jitter+adapt_diag", idata_kwargs={'log_likelihood': True})
                   
     return trace, WMmodel
 ```
@@ -365,7 +365,7 @@ for exp in experiments:
     
     # 1. Run Standard Models
     for m_name, constraints in models_config.items():
-        
+        print(f"\n--- Running Model: {m_name} ---")
         # Construct full model name for saving
         full_model_name = f"{m_name}_{exp}"
         save_dir = os.path.join(cpath, 'data', m_name)
@@ -399,6 +399,7 @@ for exp in experiments:
 ## Model Comparison
 
 ```{python}
+
 def check_model_reliability(traces_dict, ic='loo', pareto_k_thresh=0.7):
     try:
         compare_df = az.compare(traces_dict, ic=ic, scale='deviance')
@@ -480,6 +481,112 @@ plt.show()
 ```
 
 ## Parameter Visualization
+```{python}
+def visualize_posterior_means(model_name, params=['k_s', 'l_s', 'k_r'], experiments=None):
+    """
+    Visualize posterior means (and posterior SDs) of parameters across experiments
+    for a given model, using the full posterior draws.
+
+    For subject-level parameters (e.g., k_s with shape n_sub), this function:
+      1. Averages across subject dimensions within each draw,
+      2. Then summarizes that draw-wise mean across chains and draws.
+
+    Parameters
+    ----------
+    model_name : str
+        Name of the model directory (e.g., 'FreeParameters', 'Experimentwise').
+    params : list of str
+        Parameter names to visualize (e.g., ['k_s', 'l_s', 'k_r']).
+    experiments : list of str or None
+        Experiments to include. If None, uses the standard 5 experiments.
+    """
+    if experiments is None:
+        experiments = ['Baseline', 'Encoding', 'Reproduction', 'Both', 'Both_gap']
+
+    # Collect parameter estimates
+    param_data = {p: {'mean': [], 'sd': [], 'exp': []} for p in params}
+
+    for exp in experiments:
+        trace_path = os.path.join(cpath, 'data', model_name, f'{exp}_trace.nc')
+        if not os.path.exists(trace_path):
+            print(f"Warning: {trace_path} not found, skipping {exp}")
+            # still record experiment with zeros so x-axis stays aligned
+            for param in params:
+                param_data[param]['mean'].append(0.0)
+                param_data[param]['sd'].append(0.0)
+                param_data[param]['exp'].append(exp)
+            continue
+
+        idata = az.from_netcdf(trace_path)
+
+        for param in params:
+            if param not in idata.posterior.data_vars:
+                # Parameter not present in this model/experiment
+                print(f"Note: parameter '{param}' not in {model_name}/{exp}, using 0.")
+                param_data[param]['mean'].append(0.0)
+                param_data[param]['sd'].append(0.0)
+                param_data[param]['exp'].append(exp)
+                continue
+
+            arr = idata.posterior[param]  # dims: ('chain', 'draw', ...) or ('chain','draw')
+
+            # Identify non-chain/draw dims (e.g., subject dimension)
+            reduce_dims = [d for d in arr.dims if d not in ('chain', 'draw')]
+
+            # If vector (subject-level), average across those dims to get population mean per draw
+            if len(reduce_dims) > 0:
+                arr_reduced = arr.mean(dim=reduce_dims)
+            else:
+                arr_reduced = arr  # scalar parameter
+
+            # Now summarize across chains and draws
+            mean_val = float(arr_reduced.mean(dim=('chain', 'draw')))
+            sd_val = float(arr_reduced.std(dim=('chain', 'draw')))
+
+            param_data[param]['mean'].append(mean_val)
+            param_data[param]['sd'].append(sd_val)
+            param_data[param]['exp'].append(exp)
+
+    # --- Plotting ---
+    n_params = len(params)
+    fig, axes = plt.subplots(1, n_params, figsize=(5 * n_params, 4))
+
+    if n_params == 1:
+        axes = [axes]
+
+    for i, param in enumerate(params):
+        ax = axes[i]
+
+        exps = param_data[param]['exp']
+        means = np.array(param_data[param]['mean'])
+        sds = np.array(param_data[param]['sd'])
+
+        x_pos = np.arange(len(exps))
+        ax.bar(x_pos, means, yerr=sds, alpha=0.7, capsize=5)
+
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(exps, rotation=45, ha='right')
+        ax.set_ylabel('Posterior mean')
+        ax.set_title(f'Posterior mean of {param}')
+
+        ax.axhline(y=0, color='black', linestyle='--', linewidth=0.5)
+
+    plt.suptitle(f'Posterior Means: {model_name}', fontsize=14, y=1.02)
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUTPUT_PATH, f'{model_name}_posterior_means.png'),
+                dpi=300, bbox_inches='tight')
+    plt.show()
+
+    return param_data
+# Visualize FreeParameters model
+visualize_posterior_means('FreeParameters', params=['k_s', 'l_s', 'k_r'])
+
+```
+
+Visualize Experimentwise model posterior means
+```{python}
+visualize_posterior_means('Experimentwise', params=['k_s', 'l_s', 'k_r'])
+```
 
 ```{python}
 def visualize_model_parameters(model_name, params=['k_s', 'l_s', 'k_r'], experiments=None):
@@ -565,22 +672,9 @@ def visualize_model_parameters(model_name, params=['k_s', 'l_s', 'k_r'], experim
     plt.show()
 
 # Visualize FreeParameters model
-visualize_model_parameters('FreeParameters', params=['k_s', 'l_s', 'k_r'])
+#visualize_model_parameters('FreeParameters', params=['k_s', 'l_s', 'k_r'])
 ```
 
-### Experimentwise model parameters
-
-```{python}
-# visualize Experimentwise model
-visualize_model_parameters('Experimentwise', params=['k_s', 'l_s', 'k_r'])
-```
-
-### Encoding only and Reproduction only parameters
-
-```{python}
-visualize_model_parameters('EncodingOnly')
-visualize_model_parameters('ReproductionOnly')
-```
 
 ## Model Fitting Visualization
 
